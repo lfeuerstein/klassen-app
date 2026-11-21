@@ -1,0 +1,148 @@
+/* Klassen-App – Sitzplan und Projektkompetenz. Gestaltung nach dem abgenommenen Mockup (21.11.2026). */
+:root {
+  --bg: #e9ebef; --flaeche: #ffffff; --fenster: #f6f7f9; --text: #1d2330; --leise: #5f6675; --linie: #d9dce3;
+  --akzent: #1f6feb; --akzent-weich: #e6efff; --platz: #fbfbfd; --ziel: #dff3e4; --tafel: #2f4f3a; --warn: #b54708;
+  --warn-weich: #fff4e5; --gruen: #2e9e57; --grau: #b7bcc6;
+  --w1: #1a7f37; --w2: #4cae4c; --w3: #8a8f99; --w4: #d9822b; --w5: #c93c37;
+  --schatten: 0 1px 2px rgba(0,0,0,.08), 0 2px 8px rgba(0,0,0,.06);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1216; --flaeche: #1d2128; --fenster: #161a20; --text: #e7e9ee; --leise: #9aa1ae; --linie: #333a45;
+    --akzent: #5b9bff; --akzent-weich: #1f2c44; --platz: #1a1e24; --ziel: #1e3a28; --tafel: #2c4a37; --warn: #f3a35f;
+    --warn-weich: #3a2a17; --grau: #4a515c; --schatten: 0 1px 2px rgba(0,0,0,.4);
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--fenster); color: var(--text);
+  font: 15px/1.4 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+  display: flex; flex-direction: column; min-height: 100vh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+  -webkit-tap-highlight-color: transparent;
+}
+.werkzeug {
+  display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; padding: 10px 14px;
+  background: var(--flaeche); border-bottom: 1px solid var(--linie); position: sticky; top: 0; z-index: 20;
+}
+.app-name { font-size: 16px; }
+select, input[type=number], input[type=text], input[type=email] {
+  font: inherit; padding: 7px 9px; border: 1px solid var(--linie); border-radius: 8px; background: var(--flaeche); color: var(--text);
+}
+input[type=number] { width: 64px; }
+button, .knopf {
+  font: inherit; border: 1px solid var(--linie); background: var(--flaeche); color: var(--text);
+  padding: 8px 14px; border-radius: 9px; cursor: pointer; min-height: 40px; touch-action: manipulation;
+}
+button.haupt { background: var(--akzent); border-color: var(--akzent); color: #fff; }
+button.gefahr { color: var(--w5); border-color: var(--w5); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.modus { display: inline-flex; border: 1px solid var(--linie); border-radius: 10px; overflow: hidden; }
+.modus button { border: 0; border-radius: 0; }
+.modus button.an { background: var(--akzent); color: #fff; }
+.rechts { margin-left: auto; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.schalter { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; user-select: none; -webkit-user-select: none; }
+.schalter input { width: 20px; height: 20px; }
+.nur-bearbeiten { display: none !important; }
+body.bearbeiten .nur-bearbeiten { display: inline-flex !important; gap: 8px; align-items: center; }
+body.bearbeiten .ablage-box.nur-bearbeiten { display: block !important; }
+
+.haupt-bereich { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: 0; }
+.raum { padding: 14px; overflow: auto; }
+.tafel { background: var(--tafel); color: #e8f1ea; text-align: center; border-radius: 8px; padding: 6px; font-size: 12px; letter-spacing: .05em; margin: 0 auto 14px; max-width: 420px; }
+.plaetze { display: grid; gap: 10px; }
+.platz { min-height: 108px; border: 2px dashed transparent; border-radius: 12px; background: var(--platz); display: flex; align-items: center; justify-content: center; position: relative; }
+body.bearbeiten .platz { border-color: var(--linie); }
+.platz.ziel, .ablage.ziel { border-color: var(--gruen) !important; background: var(--ziel); }
+.platz .nr { position: absolute; top: 3px; left: 6px; font-size: 10px; color: var(--leise); display: none; }
+body.bearbeiten .platz .nr { display: block; }
+.ablage-box { margin-top: 14px; }
+.ablage { display: flex; flex-wrap: wrap; gap: 8px; min-height: 116px; border: 2px dashed var(--linie); border-radius: 12px; padding: 8px; }
+.karte {
+  width: 100px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 7px 4px; border-radius: 12px;
+  background: var(--flaeche); border: 2px solid var(--linie); position: relative;
+}
+body.bearbeiten .karte { cursor: grab; touch-action: none; }
+.karte.gewaehlt { border-color: var(--akzent); box-shadow: 0 0 0 3px var(--akzent-weich); }
+.karte.blitz { animation: blitz .5s; }
+@keyframes blitz { 0% { background: var(--ziel); } 100% { background: var(--flaeche); } }
+.karte.wird-gezogen { opacity: .35; }
+.geist { position: fixed; pointer-events: none; z-index: 50; transform: translate(-50%, -50%) rotate(-3deg); box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+.bild { width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 19px; overflow: hidden; flex: none; }
+.bild img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.name { font-size: 12px; text-align: center; line-height: 1.2; word-break: break-word; }
+.punkt { position: absolute; top: 6px; right: 8px; width: 11px; height: 11px; border-radius: 50%; background: var(--grau); }
+.punkt.heute { background: var(--gruen); }
+.punkt.abwesend { background: var(--w5); }
+.note { position: absolute; top: -8px; left: -6px; background: var(--akzent); color: #fff; font-size: 11px; font-weight: 700; border-radius: 10px; padding: 1px 6px; display: none; }
+body.noten-zeigen .note.da { display: block; }
+
+.seite { border-left: 1px solid var(--linie); background: var(--flaeche); padding: 14px; display: flex; flex-direction: column; gap: 12px; overflow: auto; }
+.seite .zu { display: none; margin-left: auto; }
+.leer { color: var(--leise); text-align: center; margin-top: 40px; }
+@media (max-width: 1000px) {
+  .haupt-bereich { grid-template-columns: 1fr; }
+  .seite {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(400px, 100vw); z-index: 40; border-left: 1px solid var(--linie);
+    box-shadow: -10px 0 40px rgba(0,0,0,.25); transform: translateX(105%); transition: transform .2s;
+    padding-top: calc(14px + env(safe-area-inset-top)); padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  }
+  body.seite-offen .seite { transform: none; }
+  .seite .zu { display: inline-block; }
+}
+.kopf { display: flex; gap: 12px; align-items: center; }
+.kopf .bild { cursor: pointer; }
+.kopf h2 { margin: 0; font-size: 18px; }
+.kopf .gesamt { margin-left: auto; text-align: right; }
+.kopf .gesamt b { font-size: 22px; display: block; }
+.kriterium { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--linie); }
+.kriterium .kn { font-weight: 600; font-size: 14px; }
+.kriterium .ks { font-size: 12px; color: var(--leise); }
+.werte { display: flex; gap: 5px; }
+.wert { width: 44px; height: 44px; min-height: 44px; padding: 0; font-weight: 700; font-size: 16px; color: #fff; border: 0; }
+.wert[data-w="++"] { background: var(--w1); } .wert[data-w="+"] { background: var(--w2); } .wert[data-w="o"] { background: var(--w3); }
+.wert[data-w="-"] { background: var(--w4); } .wert[data-w="--"] { background: var(--w5); }
+.zeile { display: flex; gap: 6px; flex-wrap: wrap; }
+.zeile input { flex: 1; min-width: 140px; }
+.protokoll { flex: 1; min-height: 120px; overflow: auto; font-size: 13px; border: 1px solid var(--linie); border-radius: 9px; padding: 6px 8px; }
+.protokoll div { display: flex; gap: 8px; padding: 4px 0; border-bottom: 1px dashed var(--linie); }
+.protokoll div:last-child { border-bottom: 0; }
+.protokoll .zeit { color: var(--leise); min-width: 96px; }
+.marke { display: inline-block; min-width: 26px; text-align: center; font-weight: 700; color: #fff; border-radius: 5px; padding: 0 4px; }
+
+.fuss { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 8px 14px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid var(--linie); font-size: 12px; color: var(--leise); background: var(--flaeche); }
+.fuss .warn { color: var(--warn); font-weight: 600; }
+.fuss .rechts { font-size: 12px; }
+.banner { background: var(--warn-weich); color: var(--warn); padding: 8px 14px; font-size: 13px; border-bottom: 1px solid var(--linie); }
+
+.start { max-width: 560px; margin: 40px auto; text-align: center; display: grid; gap: 12px; }
+.start h2 { margin: 0; }
+.start .zeile { justify-content: center; }
+
+dialog { border: 1px solid var(--linie); border-radius: 14px; padding: 0; width: min(860px, calc(100vw - 24px)); max-height: calc(100vh - 24px); background: var(--flaeche); color: var(--text); box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+dialog::backdrop { background: rgba(10,14,20,.45); }
+.dk { padding: 14px 16px; border-bottom: 1px solid var(--linie); } .dk h3 { margin: 0; font-size: 18px; }
+.di { padding: 14px 16px; display: grid; gap: 12px; max-height: calc(100vh - 190px); overflow: auto; }
+.df { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; padding: 12px 16px; border-top: 1px solid var(--linie); }
+.df .links { margin-right: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--linie); vertical-align: top; }
+.anleitung { background: var(--akzent-weich); border-radius: 9px; padding: 10px 12px; font-size: 14px; }
+.anleitung ol { margin: 6px 0 0; padding-left: 20px; }
+.leise { color: var(--leise); }
+.meldung { padding: 8px 10px; border-radius: 8px; background: var(--akzent-weich); font-size: 14px; }
+.meldung.warn { background: var(--warn-weich); color: var(--warn); }
+.menue { display: grid; gap: 8px; }
+.menue button { text-align: left; }
+.versteckt { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.foto-wahl { display: flex; gap: 10px; flex-wrap: wrap; }
+.zuschnitt { display: grid; gap: 10px; justify-items: center; }
+.zuschnitt canvas { width: min(100%, 380px); aspect-ratio: 1; border-radius: 12px; touch-action: none; background: #000; }
+.zuschnitt label { display: flex; gap: 8px; align-items: center; width: min(100%, 380px); }
+.zuschnitt input[type=range] { flex: 1; }
+.schuelerliste td button { min-height: 34px; padding: 4px 10px; }

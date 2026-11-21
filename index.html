@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Klassen-App</title>
+<meta name="description" content="Sitzplan und Schnellbewertung der Projektkompetenz. Alle Daten bleiben auf dem Gerät.">
+<meta name="theme-color" content="#1f6feb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Klassen-App">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="robots" content="noindex">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="banner" class="banner" hidden></div>
+<header class="werkzeug">
+  <b class="app-name">Klassen-App</b>
+  <label>Klasse <select id="klasse"></select></label>
+  <div class="modus"><button data-m="bewerten" class="an">Bewerten</button><button data-m="bearbeiten">Sitzplan bearbeiten</button></div>
+  <span class="nur-bearbeiten">
+    <label class="leise">Reihen <input type="number" id="reihen" min="1" max="8" inputmode="numeric"></label>
+    <label class="leise">Plätze je Reihe <input type="number" id="spalten" min="2" max="10" inputmode="numeric"></label>
+  </span>
+  <div class="rechts">
+    <label class="schalter"><input type="checkbox" id="notenZeigen"> Noten zeigen</label>
+    <button id="menueKnopf">Mehr …</button>
+    <button id="exportKnopf" class="haupt">Nach Moodle …</button>
+  </div>
+</header>
+
+<main class="haupt-bereich">
+  <section class="raum" id="raum">
+    <div id="start" class="start" hidden>
+      <h2>Noch keine Klasse</h2>
+      <p class="leise">Lege eine Klasse an. Die Namen kommen am einfachsten aus der Teilnehmerliste des Moodle-Kurses.</p>
+      <div class="zeile">
+        <button class="haupt" data-aktion="import">Teilnehmer aus Moodle …</button>
+        <button data-aktion="klassen">Klasse von Hand anlegen …</button>
+        <button data-aktion="beispiel">Beispielklasse zum Ausprobieren</button>
+      </div>
+    </div>
+    <div id="sitzplan">
+      <div class="tafel">Tafel · Lehrerpult</div>
+      <div class="plaetze" id="plaetze"></div>
+      <div class="ablage-box nur-bearbeiten">
+        <div class="leise" id="ablageTitel" style="margin-bottom:6px">Noch ohne Platz</div>
+        <div class="ablage" id="ablage" data-ablage="1"></div>
+      </div>
+    </div>
+  </section>
+  <aside class="seite" id="seite"></aside>
+</main>
+
+<footer class="fuss">
+  <span id="heuteZahl"></span>
+  <span>● grün = heute bewertet · ● rot = heute abwesend</span>
+  <span id="sicherungHinweis"></span>
+  <span class="rechts"><span>Daten liegen nur auf diesem Gerät</span><span id="stand" class="leise"></span></span>
+</footer>
+
+<!-- Mehr … -->
+<dialog id="menueDlg">
+  <div class="dk"><h3>Mehr</h3></div>
+  <div class="di menue">
+    <button data-aktion="import">Teilnehmer aus Moodle übernehmen …</button>
+    <button data-aktion="klassen">Klassen und Schüler verwalten …</button>
+    <button data-aktion="kriterien">Kriterien der Projektkompetenz …</button>
+    <button data-aktion="sichern">Sicherung speichern (alle Klassen, Fotos und Bewertungen)</button>
+    <button data-aktion="laden">Sicherung laden …</button>
+    <button data-aktion="beispiel">Beispielklasse mit erfundenen Namen anlegen</button>
+    <div class="anleitung"><b>Als App auf dem iPad ablegen:</b>
+      <ol><li>Diese Seite in Safari öffnen.</li><li>Auf „Teilen“ tippen (Kästchen mit Pfeil nach oben).</li><li>„Zum Home-Bildschirm“ wählen, dann „Hinzufügen“.</li></ol>
+      <div class="leise" style="margin-top:6px">Danach immer über das Symbol auf dem Home-Bildschirm starten. Löschst du das Symbol, sind auch die Daten weg – vorher eine Sicherung speichern.</div>
+    </div>
+  </div>
+  <div class="df"><button data-zu class="haupt">Schließen</button></div>
+</dialog>
+
+<!-- Klassen und Schüler -->
+<dialog id="klassenDlg">
+  <div class="dk"><h3>Klassen und Schüler</h3></div>
+  <div class="di">
+    <div class="zeile"><input type="text" id="neueKlasse" placeholder="Name der neuen Klasse, z. B. 1BFSHK"><button id="klasseAnlegen" class="haupt">Klasse anlegen</button></div>
+    <div id="klasseBereich">
+      <h4 style="margin:6px 0">Klasse <span id="klasseTitel"></span></h4>
+      <div class="zeile"><input type="text" id="klasseName" placeholder="Name der Klasse"><button id="klasseUmbenennen">Umbenennen</button><button id="klasseLoeschen" class="gefahr">Klasse löschen</button></div>
+      <h4 style="margin:12px 0 6px">Schüler von Hand hinzufügen</h4>
+      <div class="zeile"><input type="text" id="neuName" placeholder="Vorname Nachname"><input type="email" id="neuMail" placeholder="E-Mail-Adresse wie in Moodle"><button id="schuelerAnlegen">Hinzufügen</button></div>
+      <table class="schuelerliste" id="schuelerListe"></table>
+    </div>
+  </div>
+  <div class="df"><button data-zu class="haupt">Fertig</button></div>
+</dialog>
+
+<!-- Import -->
+<dialog id="importDlg">
+  <div class="dk"><h3>Teilnehmer aus Moodle übernehmen</h3></div>
+  <div class="di">
+    <div class="anleitung"><b>So kommt die Klasse in die App:</b>
+      <ol><li>In Moodle im Kurs: <i>Teilnehmer/innen → alle auswählen → „Mit Auswahl …“ → Tabellendaten herunterladen als CSV</i>.<br>
+        Es geht auch der Export aus <i>Bewertungen → Export → CSV-Datei</i>.</li>
+      <li>Hier „CSV-Datei wählen“ und die Datei aus „Dateien“ nehmen.</li>
+      <li>Prüfen, wer übernommen wird, und „Übernehmen“ tippen. Die E-Mail-Adresse braucht später der Export nach Moodle.</li></ol>
+    </div>
+    <div class="zeile"><button id="csvWaehlen" class="haupt">CSV-Datei wählen …</button><input type="file" id="csvDatei" accept=".csv,text/csv,text/plain" class="versteckt"></div>
+    <div id="importVorschau"></div>
+  </div>
+  <div class="df">
+    <label class="links leise">Ziel <select id="importZiel"></select></label>
+    <input type="text" id="importNeuName" placeholder="Name der neuen Klasse" hidden>
+    <button data-zu>Abbrechen</button><button id="importUebernehmen" class="haupt" disabled>Übernehmen</button>
+  </div>
+</dialog>
+
+<!-- Kriterien -->
+<dialog id="kriterienDlg">
+  <div class="dk"><h3>Kriterien der Projektkompetenz</h3></div>
+  <div class="di"><p class="leise" style="margin:0">Name und Gewicht je Kriterium. Ein Tipp in der Bewertung zählt so: ++ = 1, + = 2, o = 3, − = 4, −− = 5.</p><div id="kriterienListe"></div><button id="kritNeu">+ Kriterium</button></div>
+  <div class="df"><button data-zu class="haupt">Fertig</button></div>
+</dialog>
+
+<!-- Export -->
+<dialog id="exportDlg">
+  <div class="dk"><h3>Nach Moodle exportieren</h3></div>
+  <div class="di">
+    <div class="zeile" style="align-items:center">
+      <label>Notenspalte in Moodle <input type="text" id="spalteName" value="Projektkompetenz"></label>
+      <label>Zeitraum <select id="zeitraum"><option value="alle">ganzes Schuljahr</option><option value="30">letzte 30 Tage</option><option value="heute">nur heute</option></select></label>
+    </div>
+    <p class="leise" style="margin:0">So sieht es jeder Schüler in Moodle unter „Bewertungen“: die Punkte als Bewertung, darunter das Feedback.</p>
+    <div id="exportWarnung"></div>
+    <table id="exportTabelle"></table>
+    <div class="anleitung"><b>In Moodle einlesen (etwa 1 Minute):</b>
+      <ol><li>Im Kurs: <i>Bewertungen → Import → CSV-Datei</i>.</li>
+      <li>Die gespeicherte Datei wählen, Trennzeichen <i>Semikolon</i>, Kodierung <i>UTF-8</i>.</li>
+      <li>Zuordnen: <i>E-Mail-Adresse</i> → <i>E-Mail-Adresse</i>, Spalte „Projektkompetenz“ → die Bewertung „Projektkompetenz“ (oder „Neue Bewertung“), <i>Feedback</i> → Feedback dieser Bewertung.</li></ol>
+    </div>
+  </div>
+  <div class="df"><button data-zu>Schließen</button><button id="csvKnopf" class="haupt">Datei für Moodle speichern</button></div>
+</dialog>
+
+<!-- Foto -->
+<dialog id="fotoDlg">
+  <div class="dk"><h3>Foto für <span id="fotoName"></span></h3></div>
+  <div class="di">
+    <div class="foto-wahl">
+      <button id="fotoKameraKnopf" class="haupt">Foto aufnehmen</button>
+      <button id="fotoDateiKnopf">Bild wählen …</button>
+      <input type="file" id="fotoKamera" accept="image/*" capture="environment" class="versteckt">
+      <input type="file" id="fotoDatei" accept="image/*" class="versteckt">
+    </div>
+    <div class="zuschnitt" id="zuschnitt" hidden>
+      <canvas id="fotoCanvas" width="600" height="600"></canvas>
+      <label>Größe <input type="range" id="fotoZoom" min="1" max="4" step="0.01" value="1"></label>
+      <p class="leise" style="margin:0">Mit dem Finger verschieben, bis das Gesicht im Kreis sitzt.</p>
+    </div>
+    <p class="leise" style="margin:0">Das Foto bleibt nur auf diesem Gerät.</p>
+  </div>
+  <div class="df"><button id="fotoLoeschen" class="gefahr links">Foto entfernen</button><button data-zu>Abbrechen</button><button id="fotoSpeichern" class="haupt" disabled>Speichern</button></div>
+</dialog>
+
+<input type="file" id="sicherungDatei" accept=".json,application/json" class="versteckt">
+<script src="app.js"></script>
+</body>
+</html>

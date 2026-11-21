@@ -1,0 +1,16 @@
+# Nie Daten von Schülerinnen und Schülern ins Repository: keine Teilnehmerlisten, Exporte, Sicherungen, Fotos
+*.csv
+*.json
+!package.json
+*.xlsx
+*.xls
+*.ods
+*.jpg
+*.jpeg
+*.heic
+*.webp
+# Bildschirmfotos aus Tests können Namen zeigen; erlaubt sind nur die App-Symbole
+*.png
+!icons/*.png
+test/
+pruefung/
