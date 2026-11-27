@@ -60,7 +60,10 @@ body.bearbeiten .ablage-box.nur-bearbeiten { display: block !important; }
    … Durch den Namensstreifen haben wir dann eine Art Flur oder Abstand zwischen den Bildern.“; davor 8 px) */
 :root { --gang-schmal: 0px; --reihe-abstand: 0px; --gang-tippen: 22px; --gang-breit: 26px; }
 .plaetze { display: flex; flex-direction: column; }
-.reihe, .reihen-gang { display: grid; }
+/* Kacheln höchstens 4 : 3 breit (Wunsch 27.11.2026 ~14:46: „bei der Anwesenheit sollen dann die Köpfe oben und unten nicht abgeschnitten sein“ – ohne
+   Seitenspalte wurden die Tische 171 × 74 breit) = Format des Zuschnitts; ist mehr Platz da, steht der Sitzplan mittig, die Tische bleiben aneinander. */
+.plaetze { --platz-b: calc(var(--platz-h, 120px) * 4 / 3); }
+.reihe, .reihen-gang { display: grid; justify-content: center; }
 .platz { min-height: var(--platz-h, 120px); padding: 5px; border: 2px dashed transparent; border-radius: 12px; background: var(--platz); display: flex; align-items: center; justify-content: center; position: relative; }
 /* Die Karte füllt den ganzen Tisch (Wunsch 27.11.2026, Stand .24: „… dass die Bilder den kompletten Tisch, also das Rechteck ausfüllen“) */
 .platz .karte { width: 100%; max-width: none; height: auto; align-self: stretch; container-type: inline-size; }
@@ -132,7 +135,7 @@ body.bearbeiten .platz .nr { display: block; }
 .ablage-box { margin-top: 14px; }
 .ablage { display: flex; flex-wrap: wrap; gap: 8px; min-height: 116px; border: 2px dashed var(--linie); border-radius: 12px; padding: 8px; }
 .karte {
-  width: 100px; height: 96px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: pointer;
+  width: 112px; height: 84px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: pointer;
   display: block; padding: 0; border-radius: 12px;
   background: var(--flaeche); border: 2px solid var(--linie); position: relative;
 }
@@ -241,8 +244,8 @@ th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--lini
 .foto-zeile.doppelt { outline: 2px solid var(--w5); }
 @media (max-width: 620px) { .foto-zeile { grid-template-columns: 56px minmax(0, 1fr) auto; } .foto-zeile select { grid-column: 2 / 3; } }
 .zuschnitt { display: grid; gap: 10px; justify-items: center; }
-.zuschnitt canvas { width: min(100%, 380px); aspect-ratio: 1; border-radius: 12px; touch-action: none; background: #000; }
-.zuschnitt label { display: flex; gap: 8px; align-items: center; width: min(100%, 380px); }
+.zuschnitt canvas { width: min(100%, 440px); aspect-ratio: 4 / 3; border-radius: 12px; touch-action: none; background: #000; }
+.zuschnitt label { display: flex; gap: 8px; align-items: center; width: min(100%, 440px); }
 .zuschnitt input[type=range] { flex: 1; }
 .schuelerliste td button { min-height: 34px; padding: 4px 10px; }
 /* Ohne eingetragenen Durchgang stehen die Tische nebeneinander ohne Abstand (Wunsch 27.11.2026). In „Sitzplan bearbeiten“ bleiben
@@ -291,3 +294,17 @@ body.stand .st-zahl.z-bewertung { background: var(--akzent); }
 body.stand .st-zahl.z-fertig, body.stand .st-zahl.z-naechster { background: var(--w1); }
 body.stand .st-zahl.z-unterricht, body.stand .st-zahl.z-wartet, body.stand .st-zahl.z-unbekannt { background: var(--grau); color: var(--text); }
 body.stand .punkt, body.stand .haken { display: none; }
+/* Schüleransicht (Wunsch 27.11.2026): Knopf unter dem Kopf der Seitenspalte, öffnet die Bewertungsübersicht des Schülers in einem neuen Tab */
+.ansicht-zeile { align-items: center; }
+.ansicht-zeile a.knopf { text-decoration: none; display: inline-flex; align-items: center; color: var(--akzent); border-color: var(--akzent); }
+.ansicht-zeile .leise-knopf { background: none; border-color: transparent; color: var(--leise); padding: 8px 6px; }
+/* Anwesenheit mit Uhrzeiten (Wunsch 27.11.2026): Zeiträume „weg von … bis …“; Zeichen oben rechts an der Kachel öffnet das Fenster dazu.
+   Seit Stand .26 liegen die Zeichen IN der Kachel (die Tische stehen ohne Abstand, außen würden sie den Nachbarn verdecken). */
+.anw-editor { display: grid; gap: 8px; }
+.anw-zeiten { display: grid; gap: 6px; }
+.anw-zeitraum { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 14px; }
+.anw-zeitraum input[type=time] { min-height: 40px; font-size: 16px; }
+.anw-zeitraum .anw-zr-text { color: var(--w4); font-weight: 600; font-size: 13px; }
+body.anwesenheit .anw { top: 3px; right: 3px; cursor: pointer; min-width: 34px; height: 30px; }
+body.stand .st-zahl { top: 3px; right: 3px; }
+#anwDlg { width: min(560px, calc(100vw - 24px)); }

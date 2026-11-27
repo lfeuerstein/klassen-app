@@ -56,7 +56,7 @@
     <div id="sitzplan">
       <div class="anw-leiste nur-anwesenheit">
         <b id="anwDatum"></b><span id="anwText"></span><button id="anwAlleDa">Alle offenen: anwesend</button><button id="untisKnopf" class="haupt">Liste für WebUntis …</button>
-        <span class="leise">Antippen: ? → ✓ anwesend → ✕ fehlt → 🕘 kam später (Uhrzeit von jetzt) → ? wieder offen. Uhrzeit ändern: in „Bewerten“ antippen.</span>
+        <span class="leise">Bild antippen: ? → ✓ anwesend → ✕ fehlt → 🕘 kam später (jetzt) → ? wieder offen. Uhrzeiten (kam später, ging früher, zwischendurch weg): das Zeichen oben rechts an der Kachel antippen.</span>
       </div>
       <div class="plaetze" id="plaetze"></div>
       <!-- Sicht des Lehrers (Wunsch 27.11.2026): Tafel und Lehrerpult unten, vorderste Reihe direkt darüber -->
@@ -72,7 +72,7 @@
 
 <footer class="fuss">
   <span id="heuteZahl"></span>
-  <span class="legende"><span class="lp da">●</span> anwesend · <span class="lp spaet">●</span> später gekommen · <span class="lp weg">●</span> fehlt · <span class="lh">✓</span> heute bewertet</span>
+  <span class="legende"><span class="lp da">●</span> anwesend · <span class="lp spaet">●</span> zeitweise weg ·<span class="lp weg">●</span> fehlt · <span class="lh">✓</span> heute bewertet</span>
   <span id="sicherungHinweis"></span>
   <span class="rechts"><span id="speicherOrt">Daten liegen nur auf diesem Gerät</span><span id="stand" class="leise"></span></span>
 </footer>
@@ -213,9 +213,9 @@
       <input type="file" id="fotoDatei" accept="image/*" class="versteckt">
     </div>
     <div class="zuschnitt" id="zuschnitt" hidden>
-      <canvas id="fotoCanvas" width="600" height="600"></canvas>
+      <canvas id="fotoCanvas" width="600" height="450"></canvas>
       <label>Größe <input type="range" id="fotoZoom" min="0.3" max="4" step="0.01" value="1"></label>
-      <p class="leise" style="margin:0">Mit dem Finger verschieben, bis das Gesicht im hellen Rahmen sitzt – so erscheint es auf dem Tisch, unten mit dem Namen. Das Bild lässt sich auch über den Rand hinaus schieben; „Größe“ nach links macht es kleiner (freie Fläche wird weiß).</p>
+      <p class="leise" style="margin:0">Mit dem Finger verschieben – genau so erscheint das Foto auf dem Tisch, ganz unten der Name. Das Bild lässt sich auch über den Rand hinaus schieben; „Größe“ nach links macht es kleiner (freie Fläche wird weiß).</p>
     </div>
     <p class="leise" style="margin:0">Am Notebook geht auch Strg+V. <span class="nicht-moodle">Das Foto bleibt nur auf diesem Gerät.</span><span class="nur-moodle">Das Foto wird in deinen Moodle-Dateien gespeichert (nur für dich sichtbar).</span></p>
   </div>
@@ -270,6 +270,27 @@
     <input type="text" id="mkNeuName" placeholder="Name der neuen Klasse">
     <button data-zu>Abbrechen</button><button id="mkAlle" hidden title="Für jede Gruppe des Kurses (z. B. globale Gruppen 1BFSHK1, M2AH2 …) eine eigene Klasse mit allen Namen">Jede Gruppe als eigene Klasse</button><button id="mkUebernehmen" class="haupt" disabled>Übernehmen</button>
   </div>
+</dialog>
+
+<!-- Anwesenheit heute mit Uhrzeiten (Wunsch 27.11.2026: Abwesenheit mit Start- und Endzeitpunkt) – Tipp auf das Zeichen oben rechts an der Kachel -->
+<dialog id="anwDlg">
+  <div class="dk"><h3>Anwesenheit heute: <span id="anwDlgName"></span></h3></div>
+  <div class="di" id="anwDlgInhalt"></div>
+  <div class="df"><button data-zu class="haupt">Fertig</button></div>
+</dialog>
+
+<!-- Moodle-Fassung: Schüleransicht (Wunsch 27.11.2026) – in welchem Kurs die Bewertungen so gezeigt werden, wie der Schüler sie sieht -->
+<dialog id="saDlg">
+  <div class="dk"><h3>Schüleransicht: <span id="saName"></span></h3></div>
+  <div class="di">
+    <p class="leise" style="margin:0">In welchem Kurs? Moodle zeigt dir dann in einem neuen Tab die Bewertungen so, wie der Schüler sie sieht. Die App merkt sich den Kurs für diese Klasse – danach genügt ein Klick.</p>
+    <div class="zeile" style="align-items:center">
+      <label>Kurs <select id="saKurs"></select></label>
+      <label class="leise">oder Kursnummer <input type="number" id="saKursNr" inputmode="numeric" placeholder="z. B. 3190" style="width:8em;min-width:0;flex:none"></label>
+    </div>
+    <p id="saInfo" class="leise" style="margin:0"></p>
+  </div>
+  <div class="df"><button data-zu>Abbrechen</button><button id="saOeffnen" class="haupt">Schüleransicht öffnen ↗</button></div>
 </dialog>
 
 <!-- Liste für WebUntis: Anwesenheit am Ende der Stunde von Hand übertragen -->

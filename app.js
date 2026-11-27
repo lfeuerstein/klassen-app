@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.25';
+  const STAND = '2026-11-27.26';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -82,16 +82,72 @@
   const uhrzeit = (t = new Date()) => zwei(t.getHours()) + ':' + zwei(t.getMinutes());
   const anwTag = (d, tk = tagKey()) => ((d && d.anwesenheit) || {})[tk] || {};
   const anwHeute = (id) => anwTag(kd())[id] || null;
-  function anwSetzen(id, s, t) {
+  // Zeitweise abwesend (Wunsch 27.11.2026 ~14:47–14:49: „Wie lässt sich bei der Anwesenheit dann die Uhrzeit verstellen, wenn der Schüler zu einem anderen
+  // Zeitpunkt gekommen ist oder auch berücksichtigen müssen wir, wenn er früher geht?“ – „Es muss also die Abwesenheit mit Start- und Endzeitpunkt eingetragen
+  // werden können.“): s 'spaet' heißt seit Stand .26 „zeitweise abwesend“ und trägt Zeiträume ab = [{ von, bis }] ('HH:MM'; von leer = ab Unterrichtsbeginn
+  // = kam später, bis leer = bis Unterrichtsende = ging früher). Alte Einträge { s: 'spaet', t } = kam um t. t bleibt für ältere App-Stände gesetzt.
+  function anwSetzen(id, s, ab) {
     const d = kd(); if (!d) return;
     d.anwesenheit = d.anwesenheit || {}; const tk = tagKey(); const tg = (d.anwesenheit[tk] = d.anwesenheit[tk] || {});
-    if (!s) delete tg[id]; else tg[id] = { s, t: s === 'spaet' ? (t || uhrzeit()) : null, um: Date.now() };
+    if (!s) { delete tg[id]; return; }
+    if (s !== 'spaet') { tg[id] = { s, t: null, um: Date.now() }; return; }
+    const z = (ab && ab.length ? ab : [{ von: null, bis: uhrzeit() }]).map((x) => ({ von: x.von || null, bis: x.bis || null }));
+    z.sort((a, b) => String(a.von || '').localeCompare(String(b.von || '')));
+    tg[id] = { s, ab: z, t: z[0].bis || z[0].von || null, um: Date.now() };
   }
+  const anwZeiten = (e) => (e && e.s === 'spaet' ? (Array.isArray(e.ab) && e.ab.length ? e.ab : [{ von: null, bis: e.t || null }]) : []);
+  const zeitraumText = (z) => (!z.von && z.bis ? 'kam um ' + z.bis + ' Uhr' : z.von && !z.bis ? 'ging um ' + z.von + ' Uhr' : z.von && z.bis ? 'weg von ' + z.von + ' bis ' + z.bis + ' Uhr' : 'zeitweise weg');
+  const anwText = (e) => anwZeiten(e).map(zeitraumText).join(', ');
+  const anwKurz = (e) => { const z = anwZeiten(e); if (z.length > 1) return '🕘 ' + z.length + '×'; const x = z[0] || {};
+    return !x.von && x.bis ? '🕘 ' + x.bis : x.von && !x.bis ? '🚪 ' + x.von : x.von && x.bis ? x.von + '–' + x.bis : '🕘'; };
   const anwSumme = (id) => {
     let weg = 0, spaet = 0;
     for (const tg of Object.values((kd() && kd().anwesenheit) || {})) { const e = tg[id]; if (e && e.s === 'weg') weg++; if (e && e.s === 'spaet') spaet++; }
     return { weg, spaet };
   };
+  // Anwesenheit heute bearbeiten – Seitenspalte in „Bewerten“ und Fenster in „Anwesenheit“ (Tipp auf das Zeichen oben rechts an der Kachel). Aktiven Knopf
+  // erneut tippen = zurück auf „offen“. Bei „zeitweise abwesend“ je Zeitraum „weg von … bis … Uhr“ (leer = Beginn/Ende), dazu „+ ging (jetzt)“ und „kam zurück (jetzt)“.
+  function anwEditor(s, nachher) {
+    const box = document.createElement('div'); box.className = 'anw-editor';
+    const a = anwHeute(s.id);
+    const aw = document.createElement('div'); aw.className = 'anw-wahl';
+    const al = document.createElement('b'); al.textContent = 'Heute:'; aw.append(al);
+    for (const [w, t] of [['da', 'anwesend'], ['spaet', 'zeitweise abwesend'], ['weg', 'abwesend']]) {
+      const bt = document.createElement('button'); bt.textContent = t; bt.className = 'anw-' + w + (a && a.s === w ? ' an' : '');
+      bt.addEventListener('click', () => { anwSetzen(s.id, a && a.s === w ? null : w); nachher(); }); aw.append(bt);
+    }
+    box.append(aw);
+    if (!a || a.s !== 'spaet') return box;
+    const zs = anwZeiten(a).map((z) => ({ von: z.von, bis: z.bis }));
+    const speichern = () => { anwSetzen(s.id, 'spaet', zs); nachher(); };
+    const liste = document.createElement('div'); liste.className = 'anw-zeiten';
+    zs.forEach((z, i) => {
+      const r = document.createElement('div'); r.className = 'anw-zeitraum';
+      const v = document.createElement('input'); v.type = 'time'; v.value = z.von || ''; v.title = 'leer = ab Unterrichtsbeginn (kam später)'; v.setAttribute('aria-label', 'weg von');
+      const b = document.createElement('input'); b.type = 'time'; b.value = z.bis || ''; b.title = 'leer = bis Unterrichtsende (ging früher)'; b.setAttribute('aria-label', 'weg bis');
+      v.addEventListener('change', () => { z.von = v.value || null; speichern(); });
+      b.addEventListener('change', () => { z.bis = b.value || null; speichern(); });
+      const x = document.createElement('button'); x.className = 'leise-knopf'; x.textContent = '✕'; x.title = 'Diesen Zeitraum löschen';
+      x.addEventListener('click', () => { zs.splice(i, 1); if (zs.length) speichern(); else { anwSetzen(s.id, 'da'); nachher(); } });
+      const t = document.createElement('span'); t.className = 'anw-zr-text'; t.textContent = zeitraumText(z);
+      r.append('weg von ', v, ' bis ', b, x, t); liste.append(r);
+    });
+    const plus = document.createElement('div'); plus.className = 'zeile';
+    const offen = zs.find((z) => z.von && !z.bis);
+    if (offen) { const k = document.createElement('button'); k.textContent = 'kam zurück (jetzt)'; k.addEventListener('click', () => { offen.bis = uhrzeit(); speichern(); }); plus.append(k); }
+    const g = document.createElement('button'); g.textContent = '+ ging (jetzt)'; g.title = 'Neuer Zeitraum ab jetzt – „kam zurück“ trägt später das Ende ein';
+    g.addEventListener('click', () => { zs.push({ von: uhrzeit(), bis: null }); speichern(); }); plus.append(g);
+    const h = document.createElement('div'); h.className = 'leise'; h.style.fontSize = '12px'; h.textContent = 'Leeres „von“ = ab Unterrichtsbeginn (kam später), leeres „bis“ = bis Unterrichtsende (ging früher).';
+    box.append(liste, plus, h);
+    return box;
+  }
+  let anwDlgS = null;
+  function anwDlgZeichnen() {
+    const s = anwDlgS && finde(anwDlgS.id); if (!s) return;
+    $('anwDlgName').textContent = s.name; const i = $('anwDlgInhalt'); i.innerHTML = '';
+    i.append(anwEditor(s, () => { zeichne(); anwDlgZeichnen(); }));
+  }
+  function anwDlgOeffnen(s) { anwDlgS = s; anwDlgZeichnen(); $('anwDlg').showModal(); }
   // Antippen in „Anwesenheit“: ? → ✓ → ✕ → 🕘 → wieder ? (Wunsch 27.11.2026: „auch wieder auf undefiniert zurückstellen können“)
   const ANW_FOLGE = { offen: 'da', da: 'weg', weg: 'spaet', spaet: null };
   const eintraege = (id, zeitraum) => {
@@ -224,7 +280,8 @@
     const no = document.createElement('div'); const nv = noteVon(s.id, 'alle').note;
     no.className = 'note' + (nv === null ? '' : ' da'); no.textContent = nv === null ? '' : komma(nv);
     const an = document.createElement('div'); an.className = 'anw';
-    an.textContent = !a ? '?' : a.s === 'da' ? '✓' : a.s === 'weg' ? '✕' : '🕘 ' + a.t;
+    an.textContent = !a ? '?' : a.s === 'da' ? '✓' : a.s === 'weg' ? '✕' : anwKurz(a);
+    an.title = (a && a.s === 'spaet' ? anwText(a) + ' – ' : '') + 'tippen: Uhrzeiten (kam später, ging früher, zwischendurch weg)';
     // Bearbeitungsstand (nur im Reiter „Bearbeitungsstand“ sichtbar): erledigte Perlen / alle Perlen der Teilstrecke, orange = hängt
     const sz = document.createElement('div'); sz.className = 'st-zahl';
     const sd = standDaten && s.mid ? standDaten.get(Number(s.mid)) : null;
@@ -270,7 +327,7 @@
     // Sicht des Lehrers: Reihe 1 (vorn, an der Tafel) unten.
     const ga = gaengeVon(d);
     const spur = (gang) => (gang ? 'var(--gang-breit)' : modus === 'bearbeiten' ? 'var(--gang-tippen)' : 'var(--gang-schmal)');
-    const vorlage = (r) => { const t = []; for (let c = 1; c <= d.spalten; c++) { t.push('minmax(70px, 1fr)'); if (c < d.spalten) t.push(spur(ga['s' + c + ':' + r])); } return t.join(' '); };
+    const vorlage = (r) => { const t = []; for (let c = 1; c <= d.spalten; c++) { t.push('minmax(70px, var(--platz-b))'); if (c < d.spalten) t.push(spur(ga['s' + c + ':' + r])); } return t.join(' '); };
     plaetzeEl.style.gridTemplateColumns = ''; plaetzeEl.style.gridTemplateRows = '';
     plaetzeEl.innerHTML = '';
     for (const p of Object.keys(d.plaetze)) {
@@ -372,7 +429,7 @@
     $('anwText').textContent = '';
     if (kd()) {
       const lang = document.createElement('span'), kurz = document.createElement('span');
-      lang.className = 'anw-lang'; lang.textContent = zahl.da + ' anwesend · ' + zahl.spaet + ' später gekommen · ' + zahl.weg + ' fehlen · ' + offen + ' offen';
+      lang.className = 'anw-lang'; lang.textContent = zahl.da + ' anwesend · ' + zahl.spaet + ' zeitweise weg · ' + zahl.weg + ' fehlen · ' + offen + ' offen';
       kurz.className = 'anw-kurz'; kurz.textContent = '✓ ' + zahl.da + ' · 🕘 ' + zahl.spaet + ' · ✕ ' + zahl.weg + ' · ? ' + offen;
       $('anwText').append(lang, kurz);
     }
@@ -406,6 +463,7 @@
     const zu = document.createElement('button'); zu.className = 'zu'; zu.textContent = '✕'; zu.title = 'Schließen';
     zu.addEventListener('click', () => { gewaehlt = null; zeichne(); });
     kopf.append(b, h, g, zu); seite.append(kopf);
+    const az = ansichtKnoepfe(s); if (az) seite.append(az);
     if (st.nurVorname && gleicheVornamen(s)) {
       const l = document.createElement('label'); l.className = 'schalter nachname-zeigen' + (nameDoppelt(s) ? ' doppelt' : '');
       const c = document.createElement('input'); c.type = 'checkbox'; c.checked = mitNN(s);
@@ -469,21 +527,9 @@
     seite.append(zb);
     // Anwesenheit heute (ersetzt den alten Knopf „abwesend“); aktiven Knopf erneut tippen = zurück auf „offen“
     const a = anwHeute(s.id), sum = anwSumme(s.id);
-    const aw = document.createElement('div'); aw.className = 'anw-wahl';
-    const al = document.createElement('b'); al.textContent = 'Heute:'; aw.append(al);
-    for (const [w, t] of [['da', 'anwesend'], ['spaet', 'später gekommen'], ['weg', 'abwesend']]) {
-      const bt = document.createElement('button'); bt.textContent = t; bt.className = 'anw-' + w + (a && a.s === w ? ' an' : '');
-      bt.addEventListener('click', () => { anwSetzen(s.id, a && a.s === w ? null : w); zeichne(); }); aw.append(bt);
-    }
-    if (a && a.s === 'spaet') {
-      const lb = document.createElement('label'); lb.textContent = 'um ';
-      const ti = document.createElement('input'); ti.type = 'time'; ti.value = a.t || ''; ti.id = 'anwZeit';
-      ti.addEventListener('change', () => { if (ti.value) { anwSetzen(s.id, 'spaet', ti.value); zeichne(); } });
-      lb.append(ti, ' Uhr'); aw.append(lb);
-    }
     const as = document.createElement('div'); as.className = 'leise'; as.style.fontSize = '13px';
-    as.textContent = 'Bisher ' + sum.weg + '× gefehlt, ' + sum.spaet + '× später gekommen' + (a ? '' : ' · heute noch nicht erfasst');
-    seite.append(aw, as);
+    as.textContent = 'Bisher ' + sum.weg + '× gefehlt, ' + sum.spaet + '× zeitweise abwesend' + (a ? '' : ' · heute noch nicht erfasst');
+    seite.append(anwEditor(s, zeichne), as);
     const z2 = document.createElement('div'); z2.className = 'zeile';
     const fo = document.createElement('button'); fo.textContent = fotos.has(s.id) ? 'Foto ändern' : 'Foto aufnehmen'; fo.addEventListener('click', () => fotoOeffnen(s));
     const rk = document.createElement('button'); rk.textContent = '↶ Letzten Eintrag zurück'; rk.disabled = !(kd().protokoll[s.id] || []).length;
@@ -551,10 +597,45 @@
       const zu = document.createElement('button'); zu.className = 'zu'; zu.textContent = '✕'; zu.title = 'Schließen';
       zu.addEventListener('click', () => { gewaehlt = null; zeichne(); });
       kopf.append(bildEl(s), h, zu); seite.insertBefore(kopf, standBox);
+      const az = ansichtKnoepfe(s); if (az) seite.insertBefore(az, standBox);
       if (!s.mid) { const p = document.createElement('p'); p.className = 'leise'; p.textContent = 'Ohne Moodle-Konto gibt es keinen Bearbeitungsstand (von Hand angelegt).'; seite.insertBefore(p, standBox); }
     }
     standRahmenFuer(d); standJetzt();
   }
+
+  // ---------- Schüleransicht (Wunsch 27.11.2026 ~14:36: „… eine Funktion hinzu, dass ich in die Schüleransicht gehen kann. Es gibt ja bei den
+  // Bewertungskriterien auch die Möglichkeit, dass man den entsprechenden Schüler einstellt, dass man als Lehrer die Schüleransicht sieht, sodass ich dort
+  // mit einem Klick hinspringen kann, dass ich sehe, was sieht der Schüler.“) ----------
+  // Moodle zeigt der Lehrkraft unter /grade/report/user/index.php?id=<Kurs>&userid=<Konto> die Bewertungsübersicht so, wie der Schüler sie sieht
+  // (verborgene Zeilen fehlen, Summen wie beim Schüler). Kurs: d.ansichtKurs, sonst der Notenkurs d.kurs („Nach Moodle …“); ist keiner bekannt, fragt
+  // der Dialog einmal und merkt ihn je Klasse. Nur in der Moodle-Fassung und nur mit Moodle-Konto (s.mid). Öffnet einen neuen Tab, die App bleibt offen.
+  const ansichtKurs = (d) => (d && Number(d.ansichtKurs || d.kurs)) || null;
+  const schuelerAnsichtUrl = (kurs, mid) => '/grade/report/user/index.php?id=' + Number(kurs) + '&userid=' + Number(mid);
+  function ansichtKnoepfe(s) {
+    if (!IN_MOODLE || !s || !s.mid) return null;
+    const z = document.createElement('div'), k = ansichtKurs(kd()); z.className = 'zeile ansicht-zeile';
+    if (k) {
+      const a = document.createElement('a'); a.className = 'knopf'; a.href = schuelerAnsichtUrl(k, s.mid); a.target = '_blank'; a.rel = 'noopener';
+      a.textContent = 'Schüleransicht ↗'; a.title = 'Bewertungen im Kurs ' + k + ' so, wie der Schüler sie sieht (neuer Tab)'; z.append(a);
+    } else {
+      const b = document.createElement('button'); b.textContent = 'Schüleransicht ↗'; b.title = 'Kurs wählen, dann die Bewertungen so, wie der Schüler sie sieht';
+      b.addEventListener('click', () => saOeffnen(s)); z.append(b);
+    }
+    const w = document.createElement('button'); w.className = 'leise-knopf'; w.textContent = k ? 'Kurs ' + k + ' …' : 'Kurs …'; w.title = 'Kurs für die Schüleransicht ändern';
+    w.addEventListener('click', () => saOeffnen(s)); z.append(w);
+    return z;
+  }
+  let saSchueler = null;
+  async function saOeffnen(s) {
+    saSchueler = s; $('saName').textContent = s.name; $('saInfo').textContent = 'Kurse werden geladen …'; $('saDlg').showModal();
+    try { kursOptionen($('saKurs'), await moodleKurse(), ansichtKurs(kd())); $('saInfo').textContent = ''; } catch (e) { $('saInfo').textContent = moodleFehler(e); }
+  }
+  $('saKursNr').addEventListener('change', () => { kursNummer($('saKurs'), $('saKursNr')); });
+  $('saOeffnen').addEventListener('click', () => {
+    const k = Number($('saKurs').value), d = kd(); if (!k || !d || !saSchueler || !saSchueler.mid) return;
+    d.ansichtKurs = k; window.open(schuelerAnsichtUrl(k, saSchueler.mid), '_blank', 'noopener');
+    $('saDlg').close(); zeichne();
+  });
 
   function eintragen(e) {
     const p = kd().protokoll; (p[gewaehlt] = p[gewaehlt] || []).push(Object.assign({ zeit: Date.now() }, e));
@@ -568,7 +649,7 @@
   const markiere = (z) => { if (markiert) markiert.classList.remove('ziel'); markiert = z; if (z) z.classList.add('ziel'); };
   document.addEventListener('pointerdown', (e) => {
     const k = e.target.closest('.karte'); if (!k || e.button > 0 || k.closest('.seite')) return;
-    zug = { k, id: k.dataset.id, x0: e.clientX, y0: e.clientY, bewegt: false };
+    zug = { k, id: k.dataset.id, x0: e.clientX, y0: e.clientY, bewegt: false, zeichen: !!e.target.closest('.anw') };
   });
   document.addEventListener('pointermove', (e) => {
     if (!zug) return; // Ziehen geht in beiden Betriebsarten (Wunsch 27.11.): Bild auf Bild = Plätze tauschen
@@ -582,6 +663,7 @@
       if (e.type !== 'pointerup') return;
       if (modus === 'bewerten' || modus === 'stand') { gewaehlt = z.id; zeichne(); }
       else if (modus === 'anwesenheit') {
+        if (z.zeichen) { const s = finde(z.id); if (s) anwDlgOeffnen(s); return; } // Zeichen oben rechts: Uhrzeiten einstellen (Wunsch 27.11.2026)
         const a = anwHeute(z.id); anwSetzen(z.id, ANW_FOLGE[a ? a.s : 'offen']); zeichne();
         const k = document.querySelector('#plaetze .karte[data-id="' + z.id + '"], #ablage .karte[data-id="' + z.id + '"]'); if (k) k.classList.add('blitz');
       }
@@ -631,7 +713,7 @@
     const d = kd(), tg = anwTag(d, $('untisTag').value), nur = $('untisNurAbw').checked;
     return untisFolge(d).map((s, i) => {
       const e = tg[s.id];
-      return { nr: i + 1, name: untisName(s), art: e ? e.s : 'offen', status: !e ? 'nicht erfasst' : e.s === 'da' ? 'anwesend' : e.s === 'weg' ? 'fehlt' : 'kam ' + e.t + ' Uhr' };
+      return { nr: i + 1, name: untisName(s), art: e ? e.s : 'offen', status: !e ? 'nicht erfasst' : e.s === 'da' ? 'anwesend' : e.s === 'weg' ? 'fehlt' : anwText(e) };
     }).filter((z) => !nur || z.art !== 'da');
   }
   function zeichneUntis() {
@@ -1061,23 +1143,23 @@
     img.onerror = () => alert('Dieses Bild lässt sich nicht öffnen.');
     img.src = foto.url;
   }
-  const fotoMass = () => { const i = foto.img, sc = Math.max(C / i.naturalWidth, C / i.naturalHeight) * foto.zoom; return { w: i.naturalWidth * sc, h: i.naturalHeight * sc }; };
+  // Zuschnitt im Format der Kachel (Wunsch 27.11.2026 ~14:44: „Bei der Fotoeinstellung soll der Name ganz unten stehen …“): Feld C × CH = 4 : 3 wie die Kachel
+  // (höchstens 4 : 3 breit, siehe vorlage() in zeichne()); gespeichert wird 400 × 300. Ältere Fotos sind quadratisch und werden mit „cover“ eingepasst.
+  const CH = C * 3 / 4;
+  const fotoMass = () => { const i = foto.img, sc = Math.max(C / i.naturalWidth, CH / i.naturalHeight) * foto.zoom; return { w: i.naturalWidth * sc, h: i.naturalHeight * sc }; };
   // Verschieben auch über den Rahmen hinaus (Wunsch 27.11.2026 ~14:32: „… soll man es auch über den Rahmen hinaus verschieben können, so falls das
   // Bild groß ist, dass man es eben auch entsprechend positionieren kann.“): Das Bild darf bis auf einen Rest von 20 % des Feldes hinausgeschoben
   // werden; frei gewordene Fläche wird weiß (auch im gespeicherten JPEG, sonst wäre sie schwarz). Größe-Regler unter 1 = kleiner als das Feld.
-  const fotoBegrenzen = () => { const m = fotoMass(), rest = C * 0.2, mx = (m.w + C) / 2 - rest, my = (m.h + C) / 2 - rest; foto.ox = Math.max(-mx, Math.min(mx, foto.ox)); foto.oy = Math.max(-my, Math.min(my, foto.oy)); };
-  const fotoMalen = (ctx, g) => { const m = fotoMass(), f = g / C; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, g, g); ctx.drawImage(foto.img, (C / 2 - m.w / 2 + foto.ox) * f, (C / 2 - m.h / 2 + foto.oy) * f, m.w * f, m.h * f); };
-  // Kein Kreis mehr (seit Stand .24 füllt das Foto den ganzen Tisch, Wunsch 27.11.2026 „nimm das Passepartout, den Kreis weg“): Der Dialog zeigt
-  // den Bereich, den eine Kachel meist zeigt (Querformat 4 : 3, wie .karte .bild img mit object-position 50 % 35 %), darüber und darunter leicht
-  // abgedunkelt, und unten den weißen Namensstreifen. Gespeichert wird weiter das ganze Quadrat (schmale oder breite Tische zeigen etwas mehr oder weniger).
+  const fotoBegrenzen = () => { const m = fotoMass(), mx = (m.w + C) / 2 - C * 0.2, my = (m.h + CH) / 2 - CH * 0.2; foto.ox = Math.max(-mx, Math.min(mx, foto.ox)); foto.oy = Math.max(-my, Math.min(my, foto.oy)); };
+  const fotoMalen = (ctx, g) => { const m = fotoMass(), f = g / C; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, g, CH * f); ctx.drawImage(foto.img, (C / 2 - m.w / 2 + foto.ox) * f, (CH / 2 - m.h / 2 + foto.oy) * f, m.w * f, m.h * f); };
+  // Kein Kreis mehr (seit Stand .24 füllt das Foto den ganzen Tisch, Wunsch 27.11.2026 „nimm das Passepartout, den Kreis weg“). Seit Stand .26 ist das Feld
+  // genau die Kachel: unten ganz am Rand der weiße Namensstreifen (so hoch wie auf dem Tisch), kein abgedunkelter Rest, kein Foto unter dem Streifen.
   function fotoZeichnen() {
-    const ctx = $('fotoCanvas').getContext('2d'); ctx.clearRect(0, 0, C, C); fotoMalen(ctx, C);
-    const kh = C * 0.75, ko = (C - kh) * 0.35, sh = kh * 0.18;
-    ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(0, 0, C, ko); ctx.fillRect(0, ko + kh, C, C - ko - kh);
-    ctx.fillStyle = 'rgba(255,255,255,.84)'; ctx.fillRect(0, ko + kh - sh, C, sh);
+    const ctx = $('fotoCanvas').getContext('2d'); ctx.clearRect(0, 0, C, CH); fotoMalen(ctx, C);
+    const sh = CH * 0.2;
+    ctx.save(); ctx.fillStyle = 'rgba(255,255,255,.84)'; ctx.fillRect(0, CH - sh, C, sh);
     ctx.fillStyle = '#5f6675'; ctx.font = '600 ' + Math.round(sh * 0.45) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('Name', C / 2, ko + kh - sh / 2);
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.strokeRect(1.5, ko, C - 3, kh); ctx.restore();
+    ctx.fillText(foto.s ? kartenName(foto.s) : 'Name', C / 2, CH - sh / 2); ctx.restore();
   }
   const cv = $('fotoCanvas'); let fz = null;
   cv.addEventListener('pointerdown', (e) => { if (!foto.img) return; try { cv.setPointerCapture(e.pointerId); } catch (x) { /* egal */ } fz = { x: e.clientX, y: e.clientY }; });
@@ -1089,7 +1171,7 @@
   $('fotoZoom').addEventListener('input', () => { if (!foto.img) return; foto.zoom = Number($('fotoZoom').value); fotoBegrenzen(); fotoZeichnen(); });
   $('fotoSpeichern').addEventListener('click', async () => {
     if (!foto.img || !foto.s) return;
-    const out = document.createElement('canvas'); out.width = out.height = 320; fotoMalen(out.getContext('2d'), 320);
+    const out = document.createElement('canvas'); out.width = 400; out.height = 300; fotoMalen(out.getContext('2d'), 400); // 4 : 3 wie die Kachel (seit Stand .26)
     const daten = out.toDataURL('image/jpeg', 0.85);
     try { await DB.schreib('fotos', foto.s.id, daten); } catch (e) { alert('Das Foto ließ sich nicht speichern: ' + (e && e.message || e)); return; }
     if (foto.origNeu) originalMerken(foto.s.id, originalVon(foto.img));
@@ -1101,7 +1183,7 @@
     await DB.loesch('fotos', foto.s.id).catch(() => {}); fotos.delete(foto.s.id); moodleFoto(foto.s.id, null);
     originalMerken(foto.s.id, null); delete foto.s.zuschnitt; $('fotoDlg').close(); zeichne();
   });
-  $('fotoDlg').addEventListener('close', () => { if (foto.url) { URL.revokeObjectURL(foto.url); foto.url = null; } foto.img = null; $('fotoCanvas').getContext('2d').clearRect(0, 0, C, C); });
+  $('fotoDlg').addEventListener('close', () => { if (foto.url) { URL.revokeObjectURL(foto.url); foto.url = null; } foto.img = null; $('fotoCanvas').getContext('2d').clearRect(0, 0, C, CH); });
 
   // ---------- Bilder aus der Zwischenablage ----------
   // Knopf: liest die Zwischenablage (Safari auf dem iPad fragt mit „Einsetzen“ nach). Strg+V: über das paste-Ereignis unten.
