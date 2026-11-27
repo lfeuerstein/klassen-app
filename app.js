@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.24';
+  const STAND = '2026-11-27.25';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -1062,14 +1062,22 @@
     img.src = foto.url;
   }
   const fotoMass = () => { const i = foto.img, sc = Math.max(C / i.naturalWidth, C / i.naturalHeight) * foto.zoom; return { w: i.naturalWidth * sc, h: i.naturalHeight * sc }; };
-  // Größer als der Kreis: Bild deckt das Feld immer ab. Kleiner (Regler unter 1, Wunsch 27.11.2026 „auch kleiner über den Bildrand hinaus“):
-  // Bild bleibt ganz im Feld, der freie Rand wird weiß (auch im gespeicherten JPEG, sonst wäre er schwarz).
-  const fotoBegrenzen = () => { const m = fotoMass(), mx = Math.abs(m.w - C) / 2, my = Math.abs(m.h - C) / 2; foto.ox = Math.max(-mx, Math.min(mx, foto.ox)); foto.oy = Math.max(-my, Math.min(my, foto.oy)); };
+  // Verschieben auch über den Rahmen hinaus (Wunsch 27.11.2026 ~14:32: „… soll man es auch über den Rahmen hinaus verschieben können, so falls das
+  // Bild groß ist, dass man es eben auch entsprechend positionieren kann.“): Das Bild darf bis auf einen Rest von 20 % des Feldes hinausgeschoben
+  // werden; frei gewordene Fläche wird weiß (auch im gespeicherten JPEG, sonst wäre sie schwarz). Größe-Regler unter 1 = kleiner als das Feld.
+  const fotoBegrenzen = () => { const m = fotoMass(), rest = C * 0.2, mx = (m.w + C) / 2 - rest, my = (m.h + C) / 2 - rest; foto.ox = Math.max(-mx, Math.min(mx, foto.ox)); foto.oy = Math.max(-my, Math.min(my, foto.oy)); };
   const fotoMalen = (ctx, g) => { const m = fotoMass(), f = g / C; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, g, g); ctx.drawImage(foto.img, (C / 2 - m.w / 2 + foto.ox) * f, (C / 2 - m.h / 2 + foto.oy) * f, m.w * f, m.h * f); };
+  // Kein Kreis mehr (seit Stand .24 füllt das Foto den ganzen Tisch, Wunsch 27.11.2026 „nimm das Passepartout, den Kreis weg“): Der Dialog zeigt
+  // den Bereich, den eine Kachel meist zeigt (Querformat 4 : 3, wie .karte .bild img mit object-position 50 % 35 %), darüber und darunter leicht
+  // abgedunkelt, und unten den weißen Namensstreifen. Gespeichert wird weiter das ganze Quadrat (schmale oder breite Tische zeigen etwas mehr oder weniger).
   function fotoZeichnen() {
     const ctx = $('fotoCanvas').getContext('2d'); ctx.clearRect(0, 0, C, C); fotoMalen(ctx, C);
-    ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.rect(0, 0, C, C); ctx.arc(C / 2, C / 2, C / 2 - 4, 0, Math.PI * 2, true); ctx.fill('evenodd');
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(C / 2, C / 2, C / 2 - 4, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    const kh = C * 0.75, ko = (C - kh) * 0.35, sh = kh * 0.18;
+    ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(0, 0, C, ko); ctx.fillRect(0, ko + kh, C, C - ko - kh);
+    ctx.fillStyle = 'rgba(255,255,255,.84)'; ctx.fillRect(0, ko + kh - sh, C, sh);
+    ctx.fillStyle = '#5f6675'; ctx.font = '600 ' + Math.round(sh * 0.45) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('Name', C / 2, ko + kh - sh / 2);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.strokeRect(1.5, ko, C - 3, kh); ctx.restore();
   }
   const cv = $('fotoCanvas'); let fz = null;
   cv.addEventListener('pointerdown', (e) => { if (!foto.img) return; try { cv.setPointerCapture(e.pointerId); } catch (x) { /* egal */ } fz = { x: e.clientX, y: e.clientY }; });

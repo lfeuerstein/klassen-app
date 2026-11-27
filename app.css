@@ -55,7 +55,10 @@ body.bearbeiten .ablage-box.nur-bearbeiten { display: block !important; }
 .haupt-bereich { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: 0; }
 .raum { padding: 14px; overflow: auto; }
 .tafel { background: var(--tafel); color: #e8f1ea; text-align: center; border-radius: 8px; padding: 6px; font-size: 12px; letter-spacing: .05em; margin: 14px auto 0; max-width: 520px; }
-:root { --gang-schmal: 0px; --reihe-abstand: 8px; --gang-tippen: 22px; --gang-breit: 26px; } /* Durchgang nur angedeutet; ohne Durchgang stehen die Tische aneinander (Wünsche 27.11.2026) */
+/* Durchgang nur angedeutet; ohne Durchgang stehen die Tische aneinander – seit Stand .25 auch zwischen den Reihen (Wunsch 27.11.2026 ~14:35: „Damit wir
+   vertikal auch Platz sparen, nehmen dann die Abstände auch zwischen vertikalen Bildern heraus. Nur wenn Gänge eingefügt werden, dann soll ein Abstand sein
+   … Durch den Namensstreifen haben wir dann eine Art Flur oder Abstand zwischen den Bildern.“; davor 8 px) */
+:root { --gang-schmal: 0px; --reihe-abstand: 0px; --gang-tippen: 22px; --gang-breit: 26px; }
 .plaetze { display: flex; flex-direction: column; }
 .reihe, .reihen-gang { display: grid; }
 .platz { min-height: var(--platz-h, 120px); padding: 5px; border: 2px dashed transparent; border-radius: 12px; background: var(--platz); display: flex; align-items: center; justify-content: center; position: relative; }
@@ -145,17 +148,17 @@ body.bearbeiten .karte { cursor: grab; }
 .name { font-size: 12px; text-align: center; line-height: 1.2; word-break: break-word; }
 /* Auf der Karte: das Foto als Rechteck über die ganze Karte (Wunsch 27.11.2026: „Momentan werden die Bilder rund zugeschnitten. Bitte macht es so,
    dass die Bilder den kompletten Tisch, also das Rechteck ausfüllen. Der Name steht dann unten über dem Bild, ist aber farblich so hinterlegt,
-   dass man es trotz Bild lesen kann.“). Name unten auf einem dunklen Streifen; doppelte Namen auf rotem Streifen, ein zugeschalteter Nachname rot
-   hinterlegt (rote Schrift wäre auf dem dunklen Streifen schlecht lesbar). Punkt, Haken, Note und Abzeichen liegen in den Ecken darüber.
-   Ohne Foto: Farbfläche mit Kürzel. Das runde Bild in der Seitenspalte bleibt rund. */
+   dass man es trotz Bild lesen kann.“). Seit Stand .25 (Wunsch 27.11.2026 ~14:30: „… nimm da unten einen weißen Streifen, wo der Name steht. und
+   der weiße Streifen kann auch leicht transparent sein.“) steht der Name auf einem leicht durchsichtigen WEISSEN Streifen in dunkler Schrift; doppelte
+   Namen und ein zugeschalteter Nachname rot. Punkt, Haken, Note und Abzeichen liegen in den Ecken darüber. Ohne Foto: Farbfläche mit Kürzel.
+   Das runde Bild in der Seitenspalte bleibt rund. */
 .karte .bild { position: absolute; inset: 0; width: auto; height: auto; border-radius: 10px; padding-bottom: 18px; font-size: 24px; }
 .karte .bild img { object-position: 50% 35%; } /* Zuschnitte sind quadratisch, Tische breiter als hoch: eher oben lassen, damit das Gesicht bleibt */
 .platz .karte .bild { font-size: min(21cqw, calc(var(--platz-h, 120px) * .3)); }
 .karte .name { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; padding: 2px 5px 3px; border-radius: 0 0 10px 10px;
-  background: rgba(10, 14, 20, .66); color: #fff; font-weight: 600; text-shadow: 0 1px 2px rgba(0, 0, 0, .5);
+  background: rgba(255, 255, 255, .84); color: #1d2330; font-weight: 600;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-.karte .name.doppelt { background: var(--w5); color: #fff; }
-.karte .name .nn { color: #fff; background: var(--w5); border-radius: 4px; padding: 0 3px; }
+.karte .name.doppelt, .karte .name .nn { color: #c93c37; font-weight: 700; } /* fest, auch im dunklen Erscheinungsbild: der Streifen bleibt weiß */
 .karte .punkt, .karte .haken, .karte .note, .karte .st-zahl { z-index: 2; }
 .karte .punkt, .karte .haken { box-shadow: 0 0 0 2px #fff; }
 .karte.blitz { animation: blitz-rand .6s; } /* der alte Hintergrund-Blitz läge unter dem Foto */
@@ -244,7 +247,7 @@ th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--lini
 .schuelerliste td button { min-height: 34px; padding: 4px 10px; }
 /* Ohne eingetragenen Durchgang stehen die Tische nebeneinander ohne Abstand (Wunsch 27.11.2026). In „Sitzplan bearbeiten“ bleiben
    Innenrand und Rahmen der Plätze, damit Ablageziele und Tipp-Streifen für Durchgänge sichtbar sind. */
-body:not(.bearbeiten) .platz { padding-left: 0; padding-right: 0; border-left-width: 0; border-right-width: 0; }
+body:not(.bearbeiten) .platz { padding: 0; border-width: 0; } /* seit Stand .25 auch oben/unten (Reihen ohne Abstand) */
 /* Einträge je Kriterium aufklappen, mit Zeit, Bemerkung und Löschen (Wunsch 27.11.2026) */
 .kriterium .ks-knopf { background: none; border: 0; padding: 2px 0; min-height: 0; color: var(--akzent); font-size: 12px; text-align: left; cursor: pointer; }
 .kriterium .k-liste { grid-column: 1 / -1; display: grid; gap: 4px; margin-top: 4px; padding: 6px 8px; border-radius: 8px; background: var(--fenster); }
