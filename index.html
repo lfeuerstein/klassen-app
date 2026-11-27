@@ -25,6 +25,7 @@
   <span class="nur-bearbeiten">
     <label class="leise">Reihen <input type="number" id="reihen" min="1" max="8" inputmode="numeric"></label>
     <label class="leise">Plätze je Reihe <input type="number" id="spalten" min="2" max="10" inputmode="numeric"></label>
+    <button id="schuelerPlus" title="Einen einzelnen Schüler in diese Klasse aufnehmen">+ Schüler …</button>
     <span class="leise">Zwischen zwei Tische tippen: dieses Stück wird Durchgang (ein/aus)</span>
   </span>
   <div class="rechts">
@@ -95,6 +96,18 @@
     </div>
   </div>
   <div class="df"><button data-zu class="haupt">Schließen</button></div>
+</dialog>
+
+<!-- Einzelnen Schüler hinzufügen (Wunsch 27.11.2026: „zusätzlich einzelne Schüler anlegen oder auch löschen“) -->
+<dialog id="schuelerDlg">
+  <div class="dk"><h3>Schüler hinzufügen – <span id="sdKlasse"></span></h3></div>
+  <div class="di">
+    <div class="zeile"><input type="text" id="sdVorname" placeholder="Vorname" autocomplete="off" enterkeyhint="next"><input type="text" id="sdNachname" placeholder="Nachname" autocomplete="off" enterkeyhint="next"></div>
+    <div class="zeile"><input type="email" id="sdMail" placeholder="E-Mail-Adresse wie in Moodle (darf leer bleiben)" autocomplete="off" enterkeyhint="done"></div>
+    <div class="leise">Kommt auf den ersten freien Tisch (sonst in „Noch ohne Platz“); umsetzen durch Ziehen. Entfernen: Schüler in „Bewerten“ antippen › „Aus der Klasse entfernen …“.</div>
+    <div class="leise nur-moodle">Tipp: Wer in Moodle eingeschrieben ist, kommt besser über „Klasse aus SHK City …“ dazu – nur dann gehen seine Noten mit „Nach Moodle …“ in Moodle.</div>
+  </div>
+  <div class="df"><button data-zu>Abbrechen</button><button id="sdAnlegen" class="haupt">Hinzufügen</button></div>
 </dialog>
 
 <!-- Klassen und Schüler -->

@@ -156,6 +156,7 @@ body.noten-zeigen .note.da { display: block; }
 
 .seite { border-left: 1px solid var(--linie); background: var(--flaeche); padding: 14px; display: flex; flex-direction: column; gap: 12px; overflow: auto; }
 .seite .zu { display: none; margin-left: auto; }
+.seite .zeile .entfernen { margin-left: auto; } /* abgesetzt, damit man ihn nicht mit „Foto“ oder „zurück“ verwechselt (Wunsch 27.11.2026) */
 .leer { color: var(--leise); text-align: center; margin-top: 40px; }
 @media (max-width: 1000px) {
   .haupt-bereich { grid-template-columns: 1fr; }

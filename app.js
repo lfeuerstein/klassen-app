@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.18';
+  const STAND = '2026-11-27.19';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -396,7 +396,9 @@
     const fo = document.createElement('button'); fo.textContent = fotos.has(s.id) ? 'Foto ändern' : 'Foto aufnehmen'; fo.addEventListener('click', () => fotoOeffnen(s));
     const rk = document.createElement('button'); rk.textContent = '↶ Letzten Eintrag zurück'; rk.disabled = !(kd().protokoll[s.id] || []).length;
     rk.addEventListener('click', () => { const l = kd().protokoll[s.id]; if (l && l.length) l.pop(); zeichne(); });
-    z2.append(fo, rk); seite.append(z2);
+    const en = document.createElement('button'); en.className = 'gefahr entfernen'; en.textContent = 'Aus der Klasse entfernen …';
+    en.title = s.name + ' samt Bewertungen, Anwesenheit und Foto aus der Klasse nehmen'; en.addEventListener('click', () => schuelerEntfernen(s));
+    z2.append(fo, rk, en); seite.append(z2);
     const pr = document.createElement('div'); pr.className = 'protokoll';
     const l = (kd().protokoll[s.id] || []).slice().reverse();
     if (!l.length) pr.innerHTML = '<span class="leise">Protokoll: noch keine Einträge.</span>';
@@ -567,12 +569,7 @@
       const mi = document.createElement('input'); mi.type = 'email'; mi.value = s.mail || ''; mi.placeholder = 'fehlt';
       mi.addEventListener('change', () => { s.mail = mi.value.trim(); sichern(); }); m.append(mi);
       const x = document.createElement('td'); const xb = document.createElement('button'); xb.className = 'gefahr'; xb.textContent = 'entfernen';
-      xb.addEventListener('click', () => {
-        if (!confirm(s.name + ' mit allen Bewertungen und dem Foto aus dieser Klasse entfernen?')) return;
-        d.schueler = d.schueler.filter((y) => y.id !== s.id); const p = platzVon(s.id); if (p) delete d.plaetze[p];
-        delete d.protokoll[s.id]; if (fotos.has(s.id)) { moodleFoto(s.id, null); originalMerken(s.id, null); } fotos.delete(s.id); DB.loesch('fotos', s.id).catch(() => {});
-        if (gewaehlt === s.id) gewaehlt = null; zeichneKlassenDlg(); zeichne();
-      });
+      xb.addEventListener('click', () => { if (schuelerEntfernen(s)) zeichneKlassenDlg(); });
       x.append(xb); tr.append(n, m, x); t.append(tr);
     }
   }
@@ -587,6 +584,33 @@
     for (const s of d.schueler) { if (fotos.has(s.id)) { moodleFoto(s.id, null); originalMerken(s.id, null); } fotos.delete(s.id); DB.loesch('fotos', s.id).catch(() => {}); }
     delete st.klassen[st.klasse]; st.klasse = klassenSortiert()[0] || null; gewaehlt = null; zeichneKlassenDlg(); zeichne();
   });
+  // Einen Schüler mit Bewertungen, Anwesenheit und Foto aus der Klasse nehmen (Klassenliste und Seitenspalte); true = entfernt
+  function schuelerEntfernen(s) {
+    const d = kd(); if (!d || !confirm(s.name + ' mit allen Bewertungen, der Anwesenheit und dem Foto aus der Klasse „' + d.name + '“ entfernen?\nDas lässt sich nicht rückgängig machen.')) return false;
+    d.schueler = d.schueler.filter((y) => y.id !== s.id); const p = platzVon(s.id); if (p) delete d.plaetze[p];
+    delete d.protokoll[s.id]; for (const tag of Object.values(d.anwesenheit || {})) if (tag) delete tag[s.id];
+    if (fotos.has(s.id)) { moodleFoto(s.id, null); originalMerken(s.id, null); } fotos.delete(s.id); DB.loesch('fotos', s.id).catch(() => {});
+    if (gewaehlt === s.id) gewaehlt = null; zeichne(); zeigeMeldung(s.name + ' ist aus der Klasse „' + d.name + '“ entfernt.');
+    return true;
+  }
+  // Einzelnen Schüler direkt aus „Sitzplan bearbeiten“ aufnehmen (Wunsch 27.11.2026: „zusätzlich einzelne Schüler anlegen oder auch löschen“)
+  $('schuelerPlus').addEventListener('click', () => {
+    const d = kd(); if (!d) return;
+    $('sdKlasse').textContent = d.name; for (const f of ['sdVorname', 'sdNachname', 'sdMail']) $(f).value = '';
+    $('schuelerDlg').showModal(); $('sdVorname').focus();
+  });
+  const sdAnlegen = () => {
+    const d = kd(), v = $('sdVorname').value.trim(), n = $('sdNachname').value.trim(); if (!d) return;
+    if (!v && !n) { $('sdVorname').focus(); return; }
+    const s = { id: neueId('s'), name: (v + ' ' + n).trim(), mail: $('sdMail').value.trim() };
+    if (v && n) { s.vorname = v; s.nachname = n; } // getrennt wie aus Moodle: auch Doppelvornamen stimmen bei „nur Vorname“
+    d.schueler.push(s); freiSetzen(d, [s.id]); $('schuelerDlg').close(); zeichne();
+    zeigeMeldung(s.name + (platzVon(s.id) ? ' sitzt jetzt auf dem ersten freien Tisch – zum Umsetzen hinziehen.' : ' liegt in „Noch ohne Platz“ – auf einen Tisch ziehen.'));
+  };
+  $('sdAnlegen').addEventListener('click', sdAnlegen);
+  $('sdVorname').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('sdNachname').focus(); } });
+  $('sdNachname').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('sdMail').focus(); } });
+  $('sdMail').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sdAnlegen(); } });
   $('schuelerAnlegen').addEventListener('click', () => {
     const d = kd(); const n = $('neuName').value.trim(); if (!d || !n) { $('neuName').focus(); return; }
     const s = { id: neueId('s'), name: n, mail: $('neuMail').value.trim() };
