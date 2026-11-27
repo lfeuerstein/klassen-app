@@ -55,7 +55,8 @@ body.bearbeiten .ablage-box.nur-bearbeiten { display: block !important; }
 .raum { padding: 14px; overflow: auto; }
 .tafel { background: var(--tafel); color: #e8f1ea; text-align: center; border-radius: 8px; padding: 6px; font-size: 12px; letter-spacing: .05em; margin: 14px auto 0; max-width: 420px; }
 :root { --gang-schmal: 10px; --gang-tippen: 22px; --gang-breit: 46px; }
-.plaetze { display: grid; gap: 0; }
+.plaetze { display: flex; flex-direction: column; }
+.reihe, .reihen-gang { display: grid; }
 .platz { min-height: 120px; padding: 5px; border: 2px dashed transparent; border-radius: 12px; background: var(--platz); display: flex; align-items: center; justify-content: center; position: relative; }
 /* Größere Bilder (Wunsch 27.11.2026): die Karte füllt den Platz, Bild und Name wachsen mit */
 .platz .karte { width: 100%; max-width: 210px; container-type: inline-size; }

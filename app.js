@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.7';
+  const STAND = '2026-11-27.8';
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
   const WFARBE = { '++': 'var(--w1)', '+': 'var(--w2)', 'o': 'var(--w3)', '-': 'var(--w4)', '--': 'var(--w5)' };
   const ZEIG = (w) => w.replace(/-/g, '−');
@@ -156,41 +156,41 @@
     $('start').hidden = !!d; $('sitzplan').hidden = !d;
     if (!d) { gewaehlt = null; document.body.classList.remove('seite-offen'); zeichneSeite(); zeichneFuss(); return; }
     $('reihen').value = d.reihen; $('spalten').value = d.spalten;
-    // Raster: Tischspalten und -reihen, dazwischen Streifen. Jedes Streifenstück zwischen zwei Tischen ist einzeln ein Durchgang oder
-    // nicht – so kann ein Gang auch versetzt verlaufen oder nur einen Teil abdecken (Wunsch 27.11.2026). Ein Streifen mit mindestens
-    // einem Gangstück wird insgesamt breiter, damit die Tische bündig bleiben. Sicht des Lehrers: Reihe 1 (vorn, an der Tafel) unten.
+    // Jede Tischreihe hat ihre eigene Aufteilung: Zwischen zwei Tischen liegt ein breiter Durchgang nur dort, wo in DIESER Reihe ein
+    // Gangstück eingetragen ist; sonst der normale schmale Abstand. Ein kleiner Versatz zwischen den Reihen ist gewollt (Wunsch
+    // 27.11.2026). Gangstücke: 's<c>:<r>' = zwischen Platz c und c+1 in Reihe r; 'r<r>:<c>' = zwischen Reihe r und r+1 bei Platz c.
+    // Sicht des Lehrers: Reihe 1 (vorn, an der Tafel) unten.
     const ga = gaengeVon(d);
-    const sBreit = (c) => Object.keys(ga).some((k) => k.startsWith('s' + c + ':'));
-    const rBreit = (r) => Object.keys(ga).some((k) => k.startsWith('r' + r + ':'));
     const spur = (gang) => (gang ? 'var(--gang-breit)' : modus === 'bearbeiten' ? 'var(--gang-tippen)' : 'var(--gang-schmal)');
-    const sp = [], rp = [];
-    for (let c = 1; c <= d.spalten; c++) { sp.push('minmax(92px, 1fr)'); if (c < d.spalten) sp.push(spur(sBreit(c))); }
-    for (let v = 1; v <= d.reihen; v++) { rp.push('auto'); if (v < d.reihen) rp.push(spur(rBreit(d.reihen - v))); }
-    plaetzeEl.style.gridTemplateColumns = sp.join(' '); plaetzeEl.style.gridTemplateRows = rp.join(' ');
+    const vorlage = (r) => { const t = []; for (let c = 1; c <= d.spalten; c++) { t.push('minmax(92px, 1fr)'); if (c < d.spalten) t.push(spur(ga['s' + c + ':' + r])); } return t.join(' '); };
+    plaetzeEl.style.gridTemplateColumns = ''; plaetzeEl.style.gridTemplateRows = '';
     plaetzeEl.innerHTML = '';
     for (const p of Object.keys(d.plaetze)) {
       const [r, c] = p.slice(1).split('p').map(Number);
       if (r > d.reihen || c > d.spalten || !finde(d.plaetze[p])) delete d.plaetze[p];
     }
-    for (let r = 1; r <= d.reihen; r++) for (let c = 1; c <= d.spalten; c++) {
-      const id = 'r' + r + 'p' + c, el = document.createElement('div'); el.className = 'platz'; el.dataset.platz = id;
-      el.style.gridRow = String(2 * (d.reihen - r + 1) - 1); el.style.gridColumn = String(2 * c - 1);
-      const nr = document.createElement('span'); nr.className = 'nr'; nr.textContent = r + '.' + c; el.append(nr);
-      const sid = d.plaetze[id]; if (sid && finde(sid)) el.append(karte(finde(sid)));
-      plaetzeEl.append(el);
-    }
-    const zeileVon = (r) => String(2 * (d.reihen - r + 1) - 1), zwischenZeile = (r) => String(2 * (d.reihen - r));
-    for (let c = 1; c < d.spalten; c++) for (let r = 1; r <= d.reihen; r++) {
-      const k = 's' + c + ':' + r; plaetzeEl.append(gangEl(k, !!ga[k], zeileVon(r), String(2 * c), 'zwischen Platz ' + r + '.' + c + ' und ' + r + '.' + (c + 1)));
-    }
-    for (let r = 1; r < d.reihen; r++) for (let c = 1; c <= d.spalten; c++) {
-      const k = 'r' + r + ':' + c; plaetzeEl.append(gangEl(k, !!ga[k], zwischenZeile(r), String(2 * c - 1), 'zwischen Platz ' + r + '.' + c + ' und ' + (r + 1) + '.' + c));
-    }
-    // Kreuzungen füllen, wenn zwei der vier angrenzenden Stücke Gang sind (geradeaus oder um die Ecke)
-    for (let c = 1; c < d.spalten; c++) for (let r = 1; r < d.reihen; r++) {
-      const n = ['s' + c + ':' + r, 's' + c + ':' + (r + 1), 'r' + r + ':' + c, 'r' + r + ':' + (c + 1)].filter((k) => ga[k]).length;
-      const x = document.createElement('div'); x.className = 'gang kreuz' + (n >= 2 ? ' an' : '');
-      x.style.gridRow = zwischenZeile(r); x.style.gridColumn = String(2 * c); plaetzeEl.append(x);
+    for (let r = d.reihen; r >= 1; r--) {
+      const re = document.createElement('div'); re.className = 'reihe'; re.style.gridTemplateColumns = vorlage(r);
+      for (let c = 1; c <= d.spalten; c++) {
+        const id = 'r' + r + 'p' + c, el = document.createElement('div'); el.className = 'platz'; el.dataset.platz = id; el.style.gridColumn = String(2 * c - 1);
+        const nr = document.createElement('span'); nr.className = 'nr'; nr.textContent = r + '.' + c; el.append(nr);
+        const sid = d.plaetze[id]; if (sid && finde(sid)) el.append(karte(finde(sid)));
+        re.append(el);
+        if (c < d.spalten) { const k = 's' + c + ':' + r; re.append(gangEl(k, !!ga[k], String(2 * c), 'zwischen Platz ' + r + '.' + c + ' und ' + r + '.' + (c + 1))); }
+      }
+      plaetzeEl.append(re);
+      if (r === 1) break;
+      // Abstand zur Reihe davor (r-1, näher an der Tafel); breit, sobald dort irgendwo ein Gangstück liegt
+      const v = r - 1, zg = document.createElement('div'); zg.className = 'reihen-gang'; zg.style.gridTemplateColumns = vorlage(v);
+      zg.style.height = spur(Object.keys(ga).some((k) => k.startsWith('r' + v + ':')));
+      for (let c = 1; c <= d.spalten; c++) {
+        const k = 'r' + v + ':' + c; zg.append(gangEl(k, !!ga[k], String(2 * c - 1), 'zwischen Platz ' + v + '.' + c + ' und ' + r + '.' + c));
+        if (c < d.spalten) {
+          const n = ['s' + c + ':' + v, 's' + c + ':' + r, 'r' + v + ':' + c, 'r' + v + ':' + (c + 1)].filter((x) => ga[x]).length;
+          const x = document.createElement('div'); x.className = 'gang kreuz' + (n >= 2 ? ' an' : ''); x.style.gridColumn = String(2 * c); zg.append(x);
+        }
+      }
+      plaetzeEl.append(zg);
     }
     ablageEl.innerHTML = '';
     const frei = schueler().filter((s) => !platzVon(s.id)).sort((a, b) => a.name.localeCompare(b.name, 'de'));
@@ -215,9 +215,9 @@
     return d.gaenge;
   }
   // Streifenstück zwischen zwei Tischen; in „Sitzplan bearbeiten“ schaltet Antippen genau dieses Stück als Durchgang ein oder aus.
-  function gangEl(schluessel, an, zeile, spalte, wo) {
+  function gangEl(schluessel, an, spalte, wo) {
     const g = document.createElement('div'); g.className = 'gang gang-' + schluessel[0] + (an ? ' an' : '');
-    g.style.gridRow = zeile; g.style.gridColumn = spalte; g.dataset.gang = schluessel;
+    g.style.gridColumn = spalte; g.dataset.gang = schluessel;
     g.title = (an ? 'Durchgang entfernen: ' : 'Durchgang: ') + wo;
     return g;
   }
