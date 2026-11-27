@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.27';
+  const STAND = '2026-11-27.28';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -336,7 +336,12 @@
       const [r, c] = p.slice(1).split('p').map(Number);
       if (r > d.reihen || c > d.spalten || !finde(d.plaetze[p])) delete d.plaetze[p];
     }
-    for (let r = d.reihen; r >= 1; r--) {
+    // Ganz leere hintere Reihen nur in „Sitzplan bearbeiten“ zeigen (seit Stand .28, Wunsch 27.11.2026 abends: „… dann gibt es noch einen großen grauen
+    // Streifen über dem Kopf, der unnötig ist.“) – sonst lagen sie als graue Fläche über den Köpfen und nahmen den Fotos die Höhe. Vordere und mittlere
+    // leere Reihen bleiben (Abstand zur Tafel, Lage im Raum).
+    let hinten = d.reihen;
+    if (modus !== 'bearbeiten') while (hinten > 1 && ![...Array(d.spalten)].some((_, i) => d.plaetze['r' + hinten + 'p' + (i + 1)])) hinten--;
+    for (let r = hinten; r >= 1; r--) {
       const re = document.createElement('div'); re.className = 'reihe'; re.style.gridTemplateColumns = vorlage(r);
       for (let c = 1; c <= d.spalten; c++) {
         const id = 'r' + r + 'p' + c, el = document.createElement('div'); el.className = 'platz'; el.dataset.platz = id; el.style.gridColumn = String(2 * c - 1);
@@ -378,7 +383,7 @@
   function einpassen() {
     const raum = $('raum'), tafel = raum.querySelector('.tafel'), d = kd(), p = plaetzeEl.style;
     if (!d) { passSchluessel = ''; p.removeProperty('--platz-h'); p.removeProperty('--bild-max'); document.body.classList.remove('eng'); return; }
-    const schluessel = [raum.clientWidth, raum.clientHeight, st.klasse, d.raum || '', d.reihen, d.spalten, d.schueler.length, modus, JSON.stringify(d.gaenge || {})].join('|');
+    const schluessel = [raum.clientWidth, raum.clientHeight, st.klasse, d.raum || '', d.reihen, plaetzeEl.querySelectorAll('.reihe').length, d.spalten, d.schueler.length, modus, JSON.stringify(d.gaenge || {})].join('|');
     if (schluessel === passSchluessel) return;
     passSchluessel = schluessel;
     p.removeProperty('--platz-h'); p.removeProperty('--bild-max'); document.body.classList.remove('eng');

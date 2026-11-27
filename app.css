@@ -156,7 +156,13 @@ body.bearbeiten .karte { cursor: grab; }
    Namen und ein zugeschalteter Nachname rot. Punkt, Haken, Note und Abzeichen liegen in den Ecken darüber. Ohne Foto: Farbfläche mit Kürzel.
    Das runde Bild in der Seitenspalte bleibt rund. */
 .karte .bild { position: absolute; inset: 0; width: auto; height: auto; border-radius: 10px; padding-bottom: 18px; font-size: 24px; }
-.karte .bild img { object-position: 50% 35%; } /* Zuschnitte sind quadratisch, Tische breiter als hoch: eher oben lassen, damit das Gesicht bleibt */
+/* Seit Stand .28 (Wunsch 27.11.2026 abends: „Auf dem iPad sieht man bei der Anwesenheit nur die Augen von den Schülern. Bitte macht es so, dass man immer
+   die ganzen Gesichter sieht. und dann gibt es noch einen großen grauen Streifen über dem Kopf, der unnötig ist.“): Das Foto liegt ABSOLUT über der ganzen
+   Kachel. Vorher war es ein Rasterkind mit height: 100 % – die Höhe ließ sich nicht auflösen, das Foto wurde in seiner eigenen Form (quadratisch, also
+   höher als der 4 : 3-Tisch) oben angelegt: sichtbar blieb nur der Hintergrund über dem Kopf und die Augen. Jetzt deckt es die Kachel genau wie im Zuschnitt
+   (Feld 4 : 3, Namensstreifen unten über dem Foto) – was man beim Zuschneiden sieht, steht auf dem Tisch. Ältere quadratische Fotos (und Moodle-Profilbilder)
+   sind höher als der Tisch: Sie werden unten angelegt, damit der leere Rand über dem Kopf wegfällt und Mund und Kinn über dem Namensstreifen bleiben. */
+.karte .bild img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 100%; }
 .platz .karte .bild { font-size: min(21cqw, calc(var(--platz-h, 120px) * .3)); }
 .karte .name { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; padding: 2px 5px 3px; border-radius: 0 0 10px 10px;
   background: rgba(255, 255, 255, .84); color: #1d2330; font-weight: 600;
@@ -306,6 +312,12 @@ body.stand .punkt, body.stand .haken { display: none; }
 .anw-zeitraum input[type=time] { min-height: 40px; font-size: 16px; }
 .anw-zeitraum .anw-zr-text { color: var(--w4); font-weight: 600; font-size: 13px; }
 body.anwesenheit .anw { top: 3px; right: 3px; cursor: pointer; min-width: 34px; height: 30px; }
+/* Seit Stand .28 („… dass man immer die ganzen Gesichter sieht“): Das Zeichen wächst mit dem Tisch (≈ ein Fünftel der Breite, 18–26 px) statt fest 34 × 30 –
+   auf kleinen Tischen verdeckte es ein Auge. Die Tippfläche bleibt groß (unsichtbarer Rand ringsum). */
+body.anwesenheit .platz .anw { top: 2px; right: 2px; min-width: clamp(18px, 20cqw, 26px); height: clamp(18px, 20cqw, 26px); border-radius: 13px;
+  padding: 0 clamp(3px, 4cqw, 6px); font-size: clamp(11px, 12cqw, 14px); }
+body.anwesenheit .platz .anw-spaet .anw { font-size: clamp(10px, 10cqw, 12px); }
+body.anwesenheit .anw::before { content: ''; position: absolute; inset: -2px -2px -10px -10px; } /* nur nach unten/links: oben/rechts grenzt der Nachbartisch */
 body.stand .st-zahl { top: 3px; right: 3px; }
 #anwDlg { width: min(560px, calc(100vw - 24px)); }
 /* Heatmap am Foto im Reiter „Bearbeitungsstand“ (Wunsch 27.11.2026, N108): Farbe nach den erledigten Perlen im Vergleich zur Klasse – rot (zurück) · gelb · grün (vorn) */
