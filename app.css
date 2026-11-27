@@ -22,6 +22,7 @@ body {
   margin: 0; background: var(--fenster); color: var(--text);
   font: 15px/1.4 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
   display: flex; flex-direction: column; min-height: 100vh;
+  min-height: 100dvh; /* iPad-Test 27.11.2026: 100vh rechnet Safari ohne seine Leisten → Fußzeile lag unter dem Bildschirmrand */
   padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
   -webkit-tap-highlight-color: transparent;
 }
@@ -57,11 +58,26 @@ body.bearbeiten .ablage-box.nur-bearbeiten { display: block !important; }
 :root { --gang-schmal: 10px; --gang-tippen: 22px; --gang-breit: 26px; } /* Durchgang nur angedeutet (Wunsch 27.11.2026) */
 .plaetze { display: flex; flex-direction: column; }
 .reihe, .reihen-gang { display: grid; }
-.platz { min-height: 120px; padding: 5px; border: 2px dashed transparent; border-radius: 12px; background: var(--platz); display: flex; align-items: center; justify-content: center; position: relative; }
+.platz { min-height: var(--platz-h, 120px); padding: 5px; border: 2px dashed transparent; border-radius: 12px; background: var(--platz); display: flex; align-items: center; justify-content: center; position: relative; }
 /* Größere Bilder (Wunsch 27.11.2026): die Karte füllt den Platz, Bild und Name wachsen mit */
 .platz .karte { width: 100%; max-width: 210px; container-type: inline-size; }
-.platz .bild { width: 64cqw; height: auto; aspect-ratio: 1; max-width: 140px; font-size: 21cqw; }
+.platz .bild { width: min(64cqw, var(--bild-max, 140px)); height: auto; aspect-ratio: 1; max-width: 140px; font-size: min(21cqw, calc(var(--bild-max, 140px) * .33)); }
 .platz .name { font-size: clamp(12px, 9cqw, 16px); }
+/* Passt der Sitzplan nicht in die Höhe (iPad quer, Notebook), rückt alles enger zusammen; die Bildgröße setzt einpassen() in app.js
+   (iPad-Test 27.11.2026: vorderste Reihe und Tafel lagen unter dem Bildschirmrand). */
+body.eng .raum { padding-top: 10px; padding-bottom: 10px; }
+body.eng .tafel { margin-top: 8px; padding: 4px; }
+body.eng .platz { padding: 3px; }
+body.eng .platz .karte { padding: 4px 3px; gap: 2px; }
+body.eng .platz .name { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* eine Zeile: Vorname bleibt lesbar, das Bild wird größer */
+.anw-kurz { display: none; }
+body.eng .anw-kurz { display: inline; }
+body.eng .anw-lang { display: none; }
+body.eng .anw-leiste > .leise, body.eng .werkzeug .nur-bearbeiten > .leise:last-child { display: none; } /* Hinweise kosten sonst bis zu zwei Zeilen */
+/* Schmale Karten (viele Plätze je Reihe): das Bild nimmt mehr von der Breite */
+@container (max-width: 64px) { .platz .bild { width: min(84cqw, var(--bild-max, 140px)); font-size: min(28cqw, calc(var(--bild-max, 140px) * .33)); } }
+/* Kopfleiste auf dem iPad quer in einer Zeile halten */
+@media (max-width: 1200px) { .app-name { display: none; } #klasse { max-width: 200px; } }
 /* Durchgänge zwischen den Tischen */
 .gang { border-radius: 6px; }
 .gang.an { background: repeating-linear-gradient(45deg, transparent 0 7px, var(--linie) 7px 9px); }

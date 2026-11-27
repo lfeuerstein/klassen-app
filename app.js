@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.10';
+  const STAND = '2026-11-27.11';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -157,7 +157,7 @@
     zeichneKlassenwahl();
     const d = kd();
     $('start').hidden = !!d; $('sitzplan').hidden = !d;
-    if (!d) { gewaehlt = null; document.body.classList.remove('seite-offen'); zeichneSeite(); zeichneFuss(); return; }
+    if (!d) { gewaehlt = null; document.body.classList.remove('seite-offen'); zeichneSeite(); zeichneFuss(); einpassen(); return; }
     $('reihen').value = d.reihen; $('spalten').value = d.spalten;
     // Jede Tischreihe hat ihre eigene Aufteilung: Zwischen zwei Tischen liegt ein breiter Durchgang nur dort, wo in DIESER Reihe ein
     // Gangstück eingetragen ist; sonst der normale schmale Abstand. Ein kleiner Versatz zwischen den Reihen ist gewollt (Wunsch
@@ -165,7 +165,7 @@
     // Sicht des Lehrers: Reihe 1 (vorn, an der Tafel) unten.
     const ga = gaengeVon(d);
     const spur = (gang) => (gang ? 'var(--gang-breit)' : modus === 'bearbeiten' ? 'var(--gang-tippen)' : 'var(--gang-schmal)');
-    const vorlage = (r) => { const t = []; for (let c = 1; c <= d.spalten; c++) { t.push('minmax(92px, 1fr)'); if (c < d.spalten) t.push(spur(ga['s' + c + ':' + r])); } return t.join(' '); };
+    const vorlage = (r) => { const t = []; for (let c = 1; c <= d.spalten; c++) { t.push('minmax(70px, 1fr)'); if (c < d.spalten) t.push(spur(ga['s' + c + ':' + r])); } return t.join(' '); };
     plaetzeEl.style.gridTemplateColumns = ''; plaetzeEl.style.gridTemplateRows = '';
     plaetzeEl.innerHTML = '';
     for (const p of Object.keys(d.plaetze)) {
@@ -198,11 +198,37 @@
     ablageEl.innerHTML = '';
     const frei = schueler().filter((s) => !platzVon(s.id)).sort((a, b) => a.name.localeCompare(b.name, 'de'));
     frei.forEach((s) => ablageEl.append(karte(s)));
-    $('ablageTitel').textContent = 'Noch ohne Platz (' + frei.length + ') – hierher ziehen nimmt eine Karte vom Platz';
+    $('ablageTitel').textContent = 'Noch ohne Platz (' + frei.length + ') – hierher ziehen nimmt eine Karte vom Platz · zwischen zwei Tische tippen: Durchgang ein/aus';
     if (gewaehlt && !finde(gewaehlt)) gewaehlt = null;
     document.body.classList.toggle('seite-offen', !!gewaehlt);
-    zeichneSeite(); zeichneFuss(); sichern();
+    zeichneSeite(); zeichneFuss(); einpassen(); sichern();
   }
+
+  // ---------- Sitzplan in die Höhe einpassen (iPad-Test 27.11.2026) ----------
+  // Auf dem iPad quer (und am Notebook) ist der Raum niedriger als ein Sitzplan mit 120 Pixel hohen Plätzen: vorderste Reihe und Tafel
+  // lagen unter dem Bildschirmrand. Passt er nicht, rückt alles enger zusammen und die Bilder werden kleiner, bis die Tafel zu sehen ist.
+  // Gerechnet wird nur, wenn sich Größe, Klasse, Reihen, Plätze, Durchgänge oder Betriebsart geändert haben.
+  let passSchluessel = '';
+  function einpassen() {
+    const raum = $('raum'), tafel = raum.querySelector('.tafel'), d = kd(), p = plaetzeEl.style;
+    if (!d) { passSchluessel = ''; p.removeProperty('--platz-h'); p.removeProperty('--bild-max'); document.body.classList.remove('eng'); return; }
+    const schluessel = [raum.clientWidth, raum.clientHeight, st.klasse, d.reihen, d.spalten, d.schueler.length, modus, JSON.stringify(d.gaenge || {})].join('|');
+    if (schluessel === passSchluessel) return;
+    passSchluessel = schluessel;
+    p.removeProperty('--platz-h'); p.removeProperty('--bild-max'); document.body.classList.remove('eng');
+    const imRaum = (y) => y - raum.getBoundingClientRect().top + raum.scrollTop;
+    const nutzbar = () => raum.clientHeight - parseFloat(getComputedStyle(raum).paddingBottom);
+    const passt = () => imRaum(tafel.getBoundingClientRect().bottom) <= nutzbar() + 0.5;
+    if (passt()) return;
+    document.body.classList.add('eng');
+    const reihen = Math.max(1, plaetzeEl.querySelectorAll('.reihe').length);
+    const tafelH = tafel.getBoundingClientRect().height + parseFloat(getComputedStyle(tafel).marginTop);
+    const gaenge = [...plaetzeEl.querySelectorAll('.reihen-gang')].reduce((s, e) => s + e.getBoundingClientRect().height, 0);
+    const proReihe = Math.floor((nutzbar() - imRaum(plaetzeEl.getBoundingClientRect().top) - tafelH - gaenge) / reihen);
+    p.setProperty('--platz-h', Math.max(56, Math.min(120, proReihe)) + 'px');
+    for (let b = 140; b >= 28 && !passt(); b -= 4) p.setProperty('--bild-max', b + 'px');
+  }
+  if (typeof ResizeObserver === 'function') new ResizeObserver(() => einpassen()).observe($('raum'));
 
   // Durchgänge je Klasse: { 's<c>:<r>': true } = zwischen Platz c und c+1 in Reihe r; { 'r<r>:<c>': true } = zwischen Reihe r und r+1 bei Platz c.
   function gaengeVon(d) {
@@ -236,7 +262,14 @@
     const tg = anwTag(kd()), zahl = { da: 0, spaet: 0, weg: 0 };
     for (const s of schueler()) { const e = tg[s.id]; if (e) zahl[e.s]++; }
     const offen = schueler().length - zahl.da - zahl.spaet - zahl.weg;
-    $('anwText').textContent = kd() ? zahl.da + ' anwesend · ' + zahl.spaet + ' später gekommen · ' + zahl.weg + ' fehlen · ' + offen + ' offen' : '';
+    // Zwei Fassungen: lang, und kurz mit den Zeichen der Karten, wenn der Platz knapp ist (body.eng, iPad-Test 27.11.2026)
+    $('anwText').textContent = '';
+    if (kd()) {
+      const lang = document.createElement('span'), kurz = document.createElement('span');
+      lang.className = 'anw-lang'; lang.textContent = zahl.da + ' anwesend · ' + zahl.spaet + ' später gekommen · ' + zahl.weg + ' fehlen · ' + offen + ' offen';
+      kurz.className = 'anw-kurz'; kurz.textContent = '✓ ' + zahl.da + ' · 🕘 ' + zahl.spaet + ' · ✕ ' + zahl.weg + ' · ? ' + offen;
+      $('anwText').append(lang, kurz);
+    }
     $('anwDatum').textContent = new Date().toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
     const hatDaten = Object.values(st.klassen).some((k) => Object.values(k.protokoll).some((l) => l.length));
     const h = $('sicherungHinweis'); h.className = ''; h.textContent = '';
