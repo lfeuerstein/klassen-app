@@ -1,7 +1,7 @@
 /* Klassen-App: hält die Programmdateien auf dem Gerät, damit die App ohne Internet startet.
    Es werden nur die eigenen Programmdateien zwischengespeichert, keine Daten. */
-const CACHE = 'klassen-app-2026-11-27-29';
-const DATEIEN = ['./', 'index.html', 'app.css', 'app.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
+const CACHE = 'klassen-app-2026-11-28-30';
+const DATEIEN = ['./', 'index.html', 'app.css', 'app.js', 'pico.js', 'facefinder.bin', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(DATEIEN)).then(() => self.skipWaiting()));

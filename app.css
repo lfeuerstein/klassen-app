@@ -62,7 +62,7 @@ body.bearbeiten .ablage-box.nur-bearbeiten { display: block !important; }
 .plaetze { display: flex; flex-direction: column; }
 /* Kacheln höchstens 4 : 3 breit (Wunsch 27.11.2026 ~14:46: „bei der Anwesenheit sollen dann die Köpfe oben und unten nicht abgeschnitten sein“ – ohne
    Seitenspalte wurden die Tische 171 × 74 breit) = Format des Zuschnitts; ist mehr Platz da, steht der Sitzplan mittig, die Tische bleiben aneinander. */
-.plaetze { --platz-b: calc(var(--platz-h, 120px) * 4 / 3); }
+.plaetze { --platz-b: var(--platz-h, 120px); } /* seit Stand .30 quadratisch = Format des Zuschnitts auf iPad und PC (Wunsch 27.11.2026 ~23:57) */
 .reihe, .reihen-gang { display: grid; justify-content: center; }
 .platz { min-height: var(--platz-h, 120px); padding: 5px; border: 2px dashed transparent; border-radius: 12px; background: var(--platz); display: flex; align-items: center; justify-content: center; position: relative; }
 /* Die Karte füllt den ganzen Tisch (Wunsch 27.11.2026, Stand .24: „… dass die Bilder den kompletten Tisch, also das Rechteck ausfüllen“) */
@@ -75,9 +75,9 @@ body.eng .tafel { margin-top: 8px; padding: 4px; }
 body.eng .platz { padding: 3px; }
 body.eng .platz .name { display: block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* eine Zeile: Vorname bleibt lesbar, vom Bild bleibt mehr zu sehen */
 .anw-kurz { display: none; }
-body.eng .anw-kurz { display: inline; }
-body.eng .anw-lang { display: none; }
-body.eng .anw-leiste > .leise, body.eng .werkzeug .nur-bearbeiten > .leise:last-child { display: none; } /* Hinweise kosten sonst bis zu zwei Zeilen */
+body.eng #sitzplan .anw-kurz { display: inline; }
+body.eng #sitzplan .anw-lang { display: none; }
+body.eng #sitzplan > .anw-leiste > .leise, body.eng .werkzeug .nur-bearbeiten > .leise:last-child { display: none; } /* Hinweise kosten sonst bis zu zwei Zeilen */
 /* Schmale Karten (viele Plätze je Reihe): Kürzel ohne Foto etwas größer */
 @container (max-width: 64px) { .platz .karte .bild { font-size: min(28cqw, calc(var(--platz-h, 120px) * .3)); } }
 /* Kopfleiste auf dem iPad quer in einer Zeile halten */
@@ -105,6 +105,20 @@ body.bearbeiten .gang[data-gang].an { box-shadow: inset 0 0 0 2px var(--akzent);
 .nur-anwesenheit { display: none !important; }
 body.anwesenheit .nur-anwesenheit { display: flex !important; }
 .anw-leiste { gap: 10px; align-items: center; flex-wrap: wrap; margin: 0 0 12px; }
+/* Seit Stand .30 (Wunsch 27.11.2026 ~23:50: „Mach bei der Ansicht Anwesenheit das Datum rechts in die Details rein, damit oberhalb vom Sitzplan noch mehr Platz
+   ist. und wir haben jetzt Platz für die Höhe der Köpfe …“): Datum, Zahlen, Schalter und Knöpfe oben in der Seitenspalte; der Sitzplan beginnt wie in „Bewerten“. */
+.seite > .anw-leiste { margin: 0; padding-bottom: 12px; border-bottom: 1px solid var(--linie); gap: 8px 10px; }
+.seite > .anw-leiste #anwDatum { flex-basis: 100%; font-size: 17px; }
+.seite > .anw-leiste #anwText { flex-basis: 100%; }
+.seite > .anw-leiste .anw-erfassen { flex-basis: 100%; font-weight: 600; }
+.seite > .anw-leiste > .leise { flex-basis: 100%; font-size: 13px; }
+.seite > .anw-leiste.mit-auswahl > .leise { display: none; } /* mit gewähltem Schüler zählt der Platz für seine Details */
+/* Schalter „Anwesenheit erfassen“ (Wunsch 27.11.2026 ~23:55: „… dass man eventuell auch einfach nur die Bilder antippen kann, um die Anwesenheiten zu sehen und
+   dass sich nicht gleich dann der Anwesenheitsstatus verändert.“) – aus: Antippen wählt nur aus, „Alle offenen: anwesend“ ist weg. */
+.anw-erfassen input { accent-color: var(--gruen); }
+.anw-hinweis-aus { display: none; }
+body.anw-ansehen .anw-hinweis-an, body.anw-ansehen #anwAlleDa { display: none; }
+body.anw-ansehen .anw-hinweis-aus { display: inline; }
 .anw { display: none; }
 body.anwesenheit .anw { display: grid; place-items: center; position: absolute; top: -9px; right: -9px; min-width: 30px; height: 30px; padding: 0 7px; border-radius: 15px; color: #fff; font-weight: 700; font-size: 15px; background: var(--grau); box-shadow: 0 1px 3px rgba(0,0,0,.25); white-space: nowrap; z-index: 2; }
 body.anwesenheit .anw-da .anw { background: var(--gruen); }
@@ -250,7 +264,8 @@ th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--lini
 .foto-zeile.doppelt { outline: 2px solid var(--w5); }
 @media (max-width: 620px) { .foto-zeile { grid-template-columns: 56px minmax(0, 1fr) auto; } .foto-zeile select { grid-column: 2 / 3; } }
 .zuschnitt { display: grid; gap: 10px; justify-items: center; }
-.zuschnitt canvas { width: min(100%, 440px); aspect-ratio: 4 / 3; border-radius: 12px; touch-action: none; background: #000; }
+.zuschnitt canvas { width: min(100%, 460px); aspect-ratio: 1; border-radius: 12px; touch-action: none; background: #2b2f36; cursor: grab; }
+.zuschnitt .kopf-zeile { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
 .zuschnitt label { display: flex; gap: 8px; align-items: center; width: min(100%, 440px); }
 .zuschnitt input[type=range] { flex: 1; }
 .schuelerliste td button { min-height: 34px; padding: 4px 10px; }

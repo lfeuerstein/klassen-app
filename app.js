@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.29';
+  const STAND = '2026-11-28.30';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -340,6 +340,12 @@
   const plaetzeEl = $('plaetze'), ablageEl = $('ablage'), seite = $('seite');
   // Bearbeitungsstand: eingebettete Perlenkette (bleibt in der Seitenspalte stehen, damit sie nicht bei jedem Zeichnen neu lädt) und die Zahlen je Moodle-Konto
   const standBox = document.createElement('div'); standBox.className = 'stand-box'; standBox.hidden = true;
+  // Leiste der Anwesenheit (Datum, Zahlen, Schalter, Knöpfe): seit Stand .30 oben in der angedockten Seitenspalte, damit über dem Sitzplan die Höhe für die Köpfe
+  // frei wird (Wunsch 27.11.2026 ~23:50); ist die Seitenspalte nur eingeblendet (schmale Fenster), bleibt sie über dem Sitzplan.
+  const anwLeiste = $('anwLeiste'), schmal = window.matchMedia('(max-width: 1000px)');
+  if (schmal.addEventListener) schmal.addEventListener('change', () => zeichne());
+  // Schalter „Anwesenheit erfassen“ (Wunsch 27.11.2026 ~23:55): aus = Bild antippen wählt nur aus und zeigt rechts Anwesenheit und Fehlzeiten, der Status bleibt.
+  const anwErfassen = () => st.anwErfassen !== false;
   let standDaten = null;
 
   function bildEl(s) {
@@ -445,7 +451,7 @@
     // Sicht des Lehrers: Reihe 1 (vorn, an der Tafel) unten.
     const ga = gaengeVon(d);
     const spur = (gang) => (gang ? 'var(--gang-breit)' : modus === 'bearbeiten' ? 'var(--gang-tippen)' : 'var(--gang-schmal)');
-    const vorlage = (r) => { const t = []; for (let c = 1; c <= d.spalten; c++) { t.push('minmax(70px, var(--platz-b))'); if (c < d.spalten) t.push(spur(ga['s' + c + ':' + r])); } return t.join(' '); };
+    const vorlage = (r) => { const t = []; for (let c = 1; c <= d.spalten; c++) { t.push('var(--platz-b)'); if (c < d.spalten) t.push(spur(ga['s' + c + ':' + r])); } return t.join(' '); };
     plaetzeEl.style.gridTemplateColumns = ''; plaetzeEl.style.gridTemplateRows = '';
     plaetzeEl.innerHTML = '';
     for (const p of Object.keys(d.plaetze)) {
@@ -496,6 +502,7 @@
   // lagen unter dem Bildschirmrand. Passt er nicht, rückt alles enger zusammen und die Bilder werden kleiner, bis die Tafel zu sehen ist.
   // Gerechnet wird nur, wenn sich Größe, Klasse, Reihen, Plätze, Durchgänge oder Betriebsart geändert haben.
   let passSchluessel = '';
+  const TISCH_MAX = 140; // größte Tischkante in px (Tische quadratisch seit Stand .30)
   function einpassen() {
     const raum = $('raum'), tafel = raum.querySelector('.tafel'), d = kd(), p = plaetzeEl.style;
     if (!d) { passSchluessel = ''; p.removeProperty('--platz-h'); p.removeProperty('--bild-max'); document.body.classList.remove('eng'); return; }
@@ -503,6 +510,16 @@
     if (schluessel === passSchluessel) return;
     passSchluessel = schluessel;
     p.removeProperty('--platz-h'); p.removeProperty('--bild-max'); document.body.classList.remove('eng');
+    // Tische quadratisch (seit Stand .30, Zuschnitt = Tisch auf iPad und PC): zuerst so groß, dass eine Reihe samt Durchgängen in die Breite passt (höchstens
+    // TISCH_MAX), dann – wenn der Sitzplan nicht in die Höhe passt – enger und kleiner. Vorher höchstens 120 px hoch und bis 4 : 3 breit, je nach Bildschirm.
+    const wurzel = getComputedStyle(document.documentElement), px = (n) => parseFloat(wurzel.getPropertyValue(n)) || 0, ga = gaengeVon(d);
+    let gangMax = 0;
+    for (let r = 1; r <= d.reihen; r++) {
+      let g = 0; for (let c = 1; c < d.spalten; c++) g += ga['s' + c + ':' + r] ? px('--gang-breit') : modus === 'bearbeiten' ? px('--gang-tippen') : px('--gang-schmal');
+      gangMax = Math.max(gangMax, g);
+    }
+    let h = Math.max(56, Math.min(TISCH_MAX, Math.floor((plaetzeEl.clientWidth - gangMax) / Math.max(1, d.spalten))));
+    p.setProperty('--platz-h', h + 'px');
     const imRaum = (y) => y - raum.getBoundingClientRect().top + raum.scrollTop;
     const nutzbar = () => raum.clientHeight - parseFloat(getComputedStyle(raum).paddingBottom);
     const passt = () => imRaum(tafel.getBoundingClientRect().bottom) <= nutzbar() + 0.5;
@@ -512,7 +529,7 @@
     const tafelH = tafel.getBoundingClientRect().height + parseFloat(getComputedStyle(tafel).marginTop);
     const gaenge = [...plaetzeEl.querySelectorAll('.reihen-gang')].reduce((s, e) => s + e.getBoundingClientRect().height, 0);
     const proReihe = Math.floor((nutzbar() - imRaum(plaetzeEl.getBoundingClientRect().top) - tafelH - gaenge) / reihen);
-    p.setProperty('--platz-h', Math.max(56, Math.min(120, proReihe)) + 'px'); // seit Stand .24 füllt das Foto den Tisch – die Tischhöhe genügt
+    h = Math.max(56, Math.min(h, proReihe)); p.setProperty('--platz-h', h + 'px');
   }
   if (typeof ResizeObserver === 'function') new ResizeObserver(() => einpassen()).observe($('raum'));
 
@@ -557,6 +574,7 @@
       $('anwText').append(lang, kurz);
     }
     $('anwDatum').textContent = new Date().toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+    $('anwErfassen').checked = anwErfassen(); document.body.classList.toggle('anw-ansehen', !anwErfassen());
     const hatDaten = Object.values(st.klassen).some((k) => Object.values(k.protokoll).some((l) => l.length));
     const h = $('sicherungHinweis'); h.className = ''; h.textContent = '';
     if (hatDaten && !IN_MOODLE) { // in der Moodle-Fassung liegen die Daten schon in Moodle, eine Sicherungsdatei gibt es dort nicht
@@ -574,7 +592,8 @@
   // Anwesenheit sieht man dann einfach jeweils die Fehlzeiten der Vergangenheit.“ – hebt „Seitenspalte nur in Bewerten“ von Stand .22 für „Anwesenheit“ auf).
   // Inhalt: Foto und Name, Anwesenheit heute mit Uhrzeiten, Fehlzeiten bisher in zwei Zeilen (ganze Stunden / minutenweise).
   function zeichneAnwSeite(s) {
-    if (!s) { seite.insertAdjacentHTML('afterbegin', '<div class="leer">' + (kd() ? 'Ein Gesicht antippen: Anwesenheit wechseln<br>und rechts die Fehlzeiten sehen.<br><br>Zeichen oben rechts antippen:<br>nur ansehen, nichts ändern.' : '') + '</div>'); return; }
+    if (!s) { seite.insertAdjacentHTML('beforeend', '<div class="leer">' + (!kd() ? '' : anwErfassen() ? 'Ein Gesicht antippen: Anwesenheit wechseln<br>und hier die Fehlzeiten sehen.<br><br>Zeichen oben rechts antippen:<br>nur ansehen, nichts ändern.'
+      : 'Ein Gesicht antippen:<br>hier Anwesenheit und Fehlzeiten sehen.<br><br>Zum Erfassen oben<br>„Anwesenheit erfassen“ einschalten.') + '</div>'); return; }
     const kopf = document.createElement('div'); kopf.className = 'kopf';
     const b = bildEl(s); b.title = 'Foto aufnehmen oder ändern'; b.addEventListener('click', () => fotoOeffnen(s));
     const h = document.createElement('h2'); h.textContent = s.name;
@@ -583,10 +602,13 @@
     kopf.append(b, h, zu); seite.append(kopf, anwEditor(s, zeichne), fehlBox(s.id));
   }
   function zeichneSeite() {
-    for (const c of [...seite.children]) if (c !== standBox) c.remove(); // die eingebettete Perlenkette bleibt stehen (sonst lädt sie jedes Mal neu)
+    for (const c of [...seite.children]) if (c !== standBox && c !== anwLeiste) c.remove(); // die eingebettete Perlenkette bleibt stehen (sonst lädt sie jedes Mal neu)
     if (standBox.parentNode !== seite) seite.append(standBox);
     standBox.hidden = modus !== 'stand' || !kd();
     const s = gewaehlt && finde(gewaehlt);
+    if (modus === 'anwesenheit' && !schmal.matches) { if (seite.firstChild !== anwLeiste) seite.prepend(anwLeiste); }
+    else if (anwLeiste.parentNode !== plaetzeEl.parentNode) plaetzeEl.parentNode.insertBefore(anwLeiste, plaetzeEl);
+    anwLeiste.classList.toggle('mit-auswahl', !!s);
     if (modus === 'stand') { zeichneStandSeite(s); return; }
     if (modus === 'anwesenheit') { zeichneAnwSeite(s); return; }
     if (!s) { seite.insertAdjacentHTML('afterbegin', '<div class="leer">' + (kd() ? 'Ein Gesicht antippen,<br>um schnell zu bewerten.' : '') + '</div>'); return; }
@@ -817,7 +839,8 @@
       if (modus === 'bewerten' || modus === 'stand') { gewaehlt = z.id; zeichne(); }
       else if (modus === 'anwesenheit') {
         // Zeichen oben rechts / Fehlzahl oben links: nur auswählen – Uhrzeiten und Fehlzeiten stehen seit Stand .29 in der Seitenspalte (vorher Fenster)
-        if (z.zeichen) { gewaehlt = z.id; zeichne(); return; }
+        // „Anwesenheit erfassen“ aus (seit Stand .30): auch der Tipp aufs Bild wählt nur aus, der Status bleibt
+        if (z.zeichen || !anwErfassen()) { gewaehlt = z.id; zeichne(); return; }
         const a = anwHeute(z.id); anwSetzen(z.id, ANW_FOLGE[a ? a.s : 'offen']); gewaehlt = z.id; zeichne();
         const k = document.querySelector('#plaetze .karte[data-id="' + z.id + '"], #ablage .karte[data-id="' + z.id + '"]'); if (k) k.classList.add('blitz');
       }
@@ -848,8 +871,9 @@
     if (modus !== 'bewerten' && modus !== 'stand') gewaehlt = null; // zwischen Bewerten und Bearbeitungsstand bleibt der Schüler gewählt
     zeichne();
   }));
+  $('anwErfassen').addEventListener('change', (e) => { if (e.target.checked) delete st.anwErfassen; else st.anwErfassen = false; zeichne(); });
   $('anwAlleDa').addEventListener('click', () => {
-    const d = kd(); if (!d) return; let n = 0;
+    const d = kd(); if (!d || !anwErfassen()) return; let n = 0;
     for (const s of d.schueler) if (!anwHeute(s.id)) { anwSetzen(s.id, 'da'); n++; }
     zeichne(); zeigeMeldung(n + ' Schüler als anwesend eingetragen.');
   });
@@ -924,7 +948,7 @@
     const a = e.target.closest('[data-aktion]'); if (!a) return;
     const offen = a.closest('dialog'); if (offen) offen.close();
     ({ import: importOeffnen, fotos: fotosOeffnen, klassen: klassenOeffnen, kriterien: kriterienOeffnen, sichern: sicherungSpeichern,
-       laden: () => $('sicherungDatei').click(), beispiel: beispielAnlegen, moodleKlasse: mkOeffnen, shkKlasse: shkOeffnen })[a.dataset.aktion]();
+       laden: () => $('sicherungDatei').click(), beispiel: beispielAnlegen, moodleKlasse: mkOeffnen, shkKlasse: shkOeffnen, kopfAlle: kopfAlleEinpassen })[a.dataset.aktion]();
   });
   $('menueKnopf').addEventListener('click', () => { $('nurVorname').checked = !!st.nurVorname; $('menueDlg').showModal(); });
   $('nurVorname').addEventListener('change', (e) => { if (e.target.checked) st.nurVorname = true; else delete st.nurVorname; zeichne(); });
@@ -1267,8 +1291,12 @@
     if (daten) DB.schreib('fotos', 'o:' + id, daten).catch(() => {}); else DB.loesch('fotos', 'o:' + id).catch(() => {});
     if (IN_MOODLE) { MO.origAuftraege.set(id, daten); moodleMerken(true); }
   }
+  // Namensstreifen wie auf dem Tisch: Anteil an der Tischhöhe (gemessen an einem Tisch im Sitzplan, sonst ein Fünftel)
+  const streifenAnteil = () => { const k = document.querySelector('#plaetze .platz .karte'), n = k && k.querySelector('.name');
+    const a = k && n ? n.getBoundingClientRect().height / k.getBoundingClientRect().height : 0; return a > 0.08 && a < 0.4 ? a : 0.2; };
   function fotoOeffnen(s) {
-    foto.s = s; foto.img = null; foto.origNeu = false; $('fotoName').textContent = s.name; $('zuschnitt').hidden = true;
+    foto.s = s; foto.img = null; foto.origNeu = false; foto.angefasst = false; foto.streifen = streifenAnteil(); $('fotoKopfInfo').textContent = '';
+    $('fotoName').textContent = s.name; $('zuschnitt').hidden = true;
     $('fotoSpeichern').disabled = true; $('fotoLoeschen').hidden = !fotos.has(s.id); $('fotoDlg').showModal();
     if (fotos.has(s.id)) fotoBearbeiten(s);
   }
@@ -1280,8 +1308,9 @@
     const img = new Image();
     img.onload = () => {
       if (foto.s !== s || foto.img) return; // inzwischen ein neues Bild gewählt
-      foto.img = img; foto.origNeu = !orig; foto.zoom = z.zoom; foto.ox = z.ox; foto.oy = z.oy; $('fotoZoom').value = z.zoom;
+      foto.img = img; foto.origNeu = !orig; foto.zoom = z.zoom; foto.ox = z.ox; foto.oy = z.oy;
       fotoBegrenzen(); $('zuschnitt').hidden = false; $('fotoSpeichern').disabled = false; fotoZeichnen();
+      if (!(orig && s.zuschnitt && s.zuschnitt.hand)) kopfAuto(false); // ohne eigene (von Hand gesetzte) Einstellung: Kopf automatisch einpassen
     };
     img.src = quelle;
   }
@@ -1293,43 +1322,176 @@
     if (foto.url) URL.revokeObjectURL(foto.url);
     foto.url = URL.createObjectURL(datei);
     const img = new Image();
-    img.onload = () => { foto.img = img; foto.origNeu = true; foto.zoom = 1; foto.ox = 0; foto.oy = 0; $('fotoZoom').value = 1; $('zuschnitt').hidden = false; $('fotoSpeichern').disabled = false; fotoZeichnen(); };
+    img.onload = () => { foto.img = img; foto.origNeu = true; foto.angefasst = false; foto.zoom = 1; foto.ox = 0; foto.oy = 0; $('zuschnitt').hidden = false; $('fotoSpeichern').disabled = false; fotoZeichnen(); kopfAuto(false); };
     img.onerror = () => alert('Dieses Bild lässt sich nicht öffnen.');
     img.src = foto.url;
   }
-  // Zuschnitt im Format der Kachel (Wunsch 27.11.2026 ~14:44: „Bei der Fotoeinstellung soll der Name ganz unten stehen …“): Feld C × CH = 4 : 3 wie die Kachel
-  // (höchstens 4 : 3 breit, siehe vorlage() in zeichne()); gespeichert wird 400 × 300. Ältere Fotos sind quadratisch und werden mit „cover“ eingepasst.
-  const CH = C * 3 / 4;
-  const fotoMass = () => { const i = foto.img, sc = Math.max(C / i.naturalWidth, CH / i.naturalHeight) * foto.zoom; return { w: i.naturalWidth * sc, h: i.naturalHeight * sc }; };
+  // Zuschnitt = genau der Tisch: seit Stand .30 quadratisch, auf dem iPad wie am PC (Wunsch 27.11.2026 ~23:57: „… Aber dass der Rahmen auch der ist, der dann
+  // später auch angezeigt wird auf dem Tablet oder auf dem PC.“); gespeichert wird 400 × 400. Ältere Fotos (320 × 320, 400 × 300) werden mit „cover“ eingepasst.
+  const CH = C;
+  const zuschnittMass = (img, zoom) => { const sc = Math.max(C / img.naturalWidth, CH / img.naturalHeight) * zoom; return { w: img.naturalWidth * sc, h: img.naturalHeight * sc }; };
+  const fotoMass = () => zuschnittMass(foto.img, foto.zoom);
   // Verschieben auch über den Rahmen hinaus (Wunsch 27.11.2026 ~14:32: „… soll man es auch über den Rahmen hinaus verschieben können, so falls das
   // Bild groß ist, dass man es eben auch entsprechend positionieren kann.“): Das Bild darf bis auf einen Rest von 20 % des Feldes hinausgeschoben
-  // werden; frei gewordene Fläche wird weiß (auch im gespeicherten JPEG, sonst wäre sie schwarz). Größe-Regler unter 1 = kleiner als das Feld.
-  const fotoBegrenzen = () => { const m = fotoMass(), mx = (m.w + C) / 2 - C * 0.2, my = (m.h + CH) / 2 - CH * 0.2; foto.ox = Math.max(-mx, Math.min(mx, foto.ox)); foto.oy = Math.max(-my, Math.min(my, foto.oy)); };
-  const fotoMalen = (ctx, g) => { const m = fotoMass(), f = g / C; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, g, CH * f); ctx.drawImage(foto.img, (C / 2 - m.w / 2 + foto.ox) * f, (CH / 2 - m.h / 2 + foto.oy) * f, m.w * f, m.h * f); };
-  // Kein Kreis mehr (seit Stand .24 füllt das Foto den ganzen Tisch, Wunsch 27.11.2026 „nimm das Passepartout, den Kreis weg“). Seit Stand .26 ist das Feld
-  // genau die Kachel: unten ganz am Rand der weiße Namensstreifen (so hoch wie auf dem Tisch), kein abgedunkelter Rest, kein Foto unter dem Streifen.
-  function fotoZeichnen() {
-    const ctx = $('fotoCanvas').getContext('2d'); ctx.clearRect(0, 0, C, CH); fotoMalen(ctx, C);
-    const sh = CH * 0.2;
-    ctx.save(); ctx.fillStyle = 'rgba(255,255,255,.84)'; ctx.fillRect(0, CH - sh, C, sh);
-    ctx.fillStyle = '#5f6675'; ctx.font = '600 ' + Math.round(sh * 0.45) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(foto.s ? kartenName(foto.s) : 'Name', C / 2, CH - sh / 2); ctx.restore();
+  // werden. Größe 0,3- bis 8-fach. Frei gewordene Fläche: seit Stand .30 das Foto stark unscharf und aufgehellt statt Weiß (Wunsch 27.11.2026 ~23:58:
+  // „… dass einfach immer der ganze Kopf zu sehen ist, aber dass der das Feld entsprechend ausfüllt.“ – bei engen Hochformat-Fotos passt der ganze Kopf nur,
+  // wenn das Foto schmaler ist als der quadratische Tisch).
+  const fotoBegrenzen = () => { foto.zoom = Math.max(0.3, Math.min(8, foto.zoom)); const m = fotoMass(), mx = (m.w + C) / 2 - C * 0.2, my = (m.h + CH) / 2 - CH * 0.2; foto.ox = Math.max(-mx, Math.min(mx, foto.ox)); foto.oy = Math.max(-my, Math.min(my, foto.oy)); };
+  const unscharfe = new WeakMap(); // je Bild ein winziges Abbild (wird groß gezogen = unscharf; ctx.filter kennt Safari nicht)
+  function unscharfMalen(ctx, g, gh, img, x, y, w, h) {
+    let k = unscharfe.get(img);
+    if (!k) {
+      const klein = document.createElement('canvas'); klein.width = 10; klein.height = Math.max(1, Math.round(10 * img.naturalHeight / img.naturalWidth)); klein.getContext('2d').drawImage(img, 0, 0, klein.width, klein.height);
+      k = document.createElement('canvas'); k.width = 80; k.height = Math.max(1, Math.round(80 * klein.height / klein.width)); const kx = k.getContext('2d'); kx.imageSmoothingEnabled = true; kx.drawImage(klein, 0, 0, k.width, k.height);
+      unscharfe.set(img, k);
+    }
+    const sc = Math.max(g / w, gh / h, 1), bw = w * sc * 1.15, bh = h * sc * 1.15; // deckend, an der Lage des Fotos ausgerichtet
+    const bx = Math.min(0, Math.max(g - bw, x + w / 2 - bw / 2)), by = Math.min(0, Math.max(gh - bh, y + h / 2 - bh / 2));
+    ctx.imageSmoothingEnabled = true; ctx.drawImage(k, bx, by, bw, bh);
+    ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.fillRect(0, 0, g, gh);
   }
-  const cv = $('fotoCanvas'); let fz = null;
-  cv.addEventListener('pointerdown', (e) => { if (!foto.img) return; try { cv.setPointerCapture(e.pointerId); } catch (x) { /* egal */ } fz = { x: e.clientX, y: e.clientY }; });
+  const zuschnittMalen = (ctx, g, img, z) => {
+    const m = zuschnittMass(img, z.zoom), f = g / C, gh = CH * f, x = (C / 2 - m.w / 2 + z.ox) * f, y = (CH / 2 - m.h / 2 + z.oy) * f, w = m.w * f, h = m.h * f;
+    if (x > 0.5 || y > 0.5 || x + w < g - 0.5 || y + h < gh - 0.5) unscharfMalen(ctx, g, gh, img, x, y, w, h); else { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, g, gh); }
+    ctx.drawImage(img, x, y, w, h);
+  };
+  const fotoMalen = (ctx, g) => zuschnittMalen(ctx, g, foto.img, foto);
+  // Anzeige (Wunsch 27.11.2026 ~23:56: „Wenn ich bei Bewerten das Foto ausrichte, da sieht man gar nicht die Grenzen außenrum, mein verschiebtes Foto auf weißem
+  // Grund und man sieht nicht, was ist jetzt der angezeigte Bereich.“): um das Feld ein dunkler Rand, in dem das Foto abgedunkelt weitergeht; das Feld selbst ist
+  // der Tisch (weiß umrandet), unten der Namensstreifen so hoch wie auf dem Tisch.
+  const RAND = Math.round(C * 0.15), cv = $('fotoCanvas');
+  cv.width = C + 2 * RAND; cv.height = CH + 2 * RAND;
+  function fotoZeichnen() {
+    const ctx = cv.getContext('2d'), W = cv.width, H = cv.height, m = fotoMass();
+    ctx.fillStyle = '#2b2f36'; ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.translate(RAND, RAND);
+    ctx.drawImage(foto.img, C / 2 - m.w / 2 + foto.ox, CH / 2 - m.h / 2 + foto.oy, m.w, m.h); // außerhalb des Felds: das Foto, gleich abgedunkelt
+    ctx.fillStyle = 'rgba(28,31,36,.68)'; ctx.beginPath(); ctx.rect(-RAND, -RAND, W, H); ctx.rect(0, 0, C, CH); ctx.fill('evenodd');
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, C, CH); ctx.clip(); fotoMalen(ctx, C); ctx.restore(); // im Feld genau das, was gespeichert wird
+    const sh = CH * (foto.streifen || 0.2);
+    ctx.fillStyle = 'rgba(255,255,255,.84)'; ctx.fillRect(0, CH - sh, C, sh);
+    ctx.fillStyle = '#5f6675'; ctx.font = '600 ' + Math.round(sh * 0.5) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(foto.s ? kartenName(foto.s) : 'Name', C / 2, CH - sh / 2, C * 0.94);
+    ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.strokeRect(-2, -2, C + 4, CH + 4);
+    ctx.restore();
+  }
+  // Verschieben mit einem Finger, Größe mit zwei Fingern (Wunsch 27.11.2026 ~23:57: „… die Größe ändern von den Bildern bitte nicht unten über diesen
+  // Schieberegler, sondern einfach, dass man mit zwei Finger größer oder kleiner ziehen kann und verschieben.“); am PC Mausrad bzw. Zwei-Finger-Geste am Touchpad.
+  const finger = new Map(); let geste = null;
+  const imFeld = (e) => { const r = cv.getBoundingClientRect(), f = cv.width / r.width; return { x: (e.clientX - r.left) * f - RAND, y: (e.clientY - r.top) * f - RAND }; };
+  const zoomUm = (p, faktor) => { // der Punkt p (Feldkoordinaten) bleibt beim Vergrößern an seiner Stelle
+    const alt = foto.zoom; foto.zoom = Math.max(0.3, Math.min(8, alt * faktor)); const k = foto.zoom / alt;
+    foto.ox = p.x - C / 2 - (p.x - C / 2 - foto.ox) * k; foto.oy = p.y - CH / 2 - (p.y - CH / 2 - foto.oy) * k;
+  };
+  const gesteNeu = () => { const p = [...finger.values()];
+    geste = p.length >= 2 ? { mitte: { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 }, abstand: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) } : p.length === 1 ? { punkt: p[0] } : null; };
+  cv.addEventListener('pointerdown', (e) => { if (!foto.img) return; try { cv.setPointerCapture(e.pointerId); } catch (x) { /* egal */ } finger.set(e.pointerId, imFeld(e)); gesteNeu(); });
   cv.addEventListener('pointermove', (e) => {
-    if (!fz) return; const f = C / cv.getBoundingClientRect().width;
-    foto.ox += (e.clientX - fz.x) * f; foto.oy += (e.clientY - fz.y) * f; fz = { x: e.clientX, y: e.clientY }; fotoBegrenzen(); fotoZeichnen();
+    if (!finger.has(e.pointerId) || !geste || !foto.img) return; finger.set(e.pointerId, imFeld(e));
+    const p = [...finger.values()];
+    if (p.length >= 2 && geste.mitte) {
+      const mitte = { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 }, abstand = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+      foto.ox += mitte.x - geste.mitte.x; foto.oy += mitte.y - geste.mitte.y;
+      if (geste.abstand > 10 && abstand > 10) zoomUm(mitte, abstand / geste.abstand);
+      geste = { mitte, abstand };
+    } else if (p.length === 1 && geste.punkt) { foto.ox += p[0].x - geste.punkt.x; foto.oy += p[0].y - geste.punkt.y; geste = { punkt: p[0] }; }
+    else return;
+    foto.angefasst = true; fotoBegrenzen(); fotoZeichnen();
   });
-  const fzEnde = () => { fz = null; }; cv.addEventListener('pointerup', fzEnde); cv.addEventListener('pointercancel', fzEnde);
-  $('fotoZoom').addEventListener('input', () => { if (!foto.img) return; foto.zoom = Number($('fotoZoom').value); fotoBegrenzen(); fotoZeichnen(); });
+  const fingerWeg = (e) => { finger.delete(e.pointerId); gesteNeu(); };
+  cv.addEventListener('pointerup', fingerWeg); cv.addEventListener('pointercancel', fingerWeg);
+  cv.addEventListener('wheel', (e) => { if (!foto.img) return; e.preventDefault(); zoomUm(imFeld(e), Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0015))); foto.angefasst = true; fotoBegrenzen(); fotoZeichnen(); }, { passive: false });
+  cv.addEventListener('gesturestart', (e) => e.preventDefault()); // Safari: kein Zoomen der ganzen Seite
+
+  // Kopf automatisch einpassen (Wunsch 27.11.2026 ~23:58: „Mach eine Autojustierung, dass einfach immer der ganze Kopf zu sehen ist, aber dass der das Feld
+  // entsprechend ausfüllt.“): Gesichtserkennung pico (pico.js + facefinder.bin, MIT, Nenad Markus) läuft nur auf dem Gerät – kein Bild verlässt es. Aus dem
+  // Gesicht wird der Kopf samt Haaren geschätzt; er füllt die Fläche über dem Namensstreifen. Danach rückt das Foto an den Rand, damit möglichst kein Weiß bleibt,
+  // ohne den Kopf anzuschneiden. Läuft bei neuen Fotos und beim Öffnen ohne eigene Einstellung; Knopf „Kopf automatisch einpassen“ jederzeit.
+  let kopfFinder = null;
+  function kopfFinderLaden() {
+    if (!kopfFinder) {
+      kopfFinder = (async () => {
+        const v = IN_MOODLE ? '?v=' + STAND : '';
+        if (!window.pico) await new Promise((ok, nein) => { const s = document.createElement('script'); s.src = 'pico.js' + v; s.onload = ok; s.onerror = () => nein(new Error('pico.js fehlt')); document.head.append(s); });
+        const r = await fetch('facefinder.bin' + v, { credentials: 'same-origin' }); if (!r.ok) throw new Error('facefinder.bin: ' + r.status);
+        return window.pico.unpack_cascade(new Int8Array(await r.arrayBuffer()));
+      })();
+      kopfFinder.catch(() => { kopfFinder = null; }); // beim nächsten Mal neu versuchen
+    }
+    return kopfFinder;
+  }
+  async function kopfFinden(img) {
+    const finde = await kopfFinderLaden(), f = Math.min(1, 480 / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.max(1, Math.round(img.naturalWidth * f)), h = Math.max(1, Math.round(img.naturalHeight * f));
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.drawImage(img, 0, 0, w, h);
+    const rgba = x.getImageData(0, 0, w, h).data, grau = new Uint8Array(w * h);
+    for (let i = 0; i < grau.length; i++) grau[i] = (2 * rgba[4 * i] + 7 * rgba[4 * i + 1] + rgba[4 * i + 2]) / 10;
+    const dets = window.pico.cluster_detections(window.pico.run_cascade({ pixels: grau, nrows: h, ncols: w, ldim: w }, finde,
+      { shiftfactor: 0.1, minsize: Math.max(20, Math.round(Math.min(w, h) * 0.1)), maxsize: Math.max(w, h), scalefactor: 1.1 }), 0.2).filter((d) => d[3] > 5);
+    if (!dets.length) return null;
+    const d = dets.sort((a, b) => b[2] * Math.min(b[3], 40) - a[2] * Math.min(a[3], 40))[0]; // das größte sichere Gesicht (im Porträt das einzige)
+    return { x: d[1] / f, y: d[0] / f, s: d[2] / f };
+  }
+  // Kopf samt Haaren im Verhältnis zur Gesichtsgröße s von pico, ab der Gesichtsmitte. Abgeglichen am 28.11.2026 (nur Zahlen, im Browser des Lehrers): 82 von 83
+  // Fotos und 55 von 56 Originalen erkannt; mit 0,62 / 0,48 liegt der Kopf im Original im Mittel bei 8 % bis 79 % der Bildhöhe, nur einmal minimal darüber.
+  const KOPF = { oben: 0.62, unten: 0.48, breit: 1.1 };
+  function kopfZuschnitt(img, k, streifen) {
+    const W = img.naturalWidth, H = img.naturalHeight, basis = Math.max(C / W, CH / H), frei = CH * (1 - streifen), rand = CH * 0.03;
+    const hoch = (KOPF.oben + KOPF.unten) * k.s, breit = KOPF.breit * k.s;
+    const zoom = Math.max(0.3, Math.min(8, Math.min((frei - 2 * rand) / hoch, (C - 2 * rand) / breit) / basis)), sc = basis * zoom, mw = W * sc, mh = H * sc;
+    let ox = mw / 2 - k.x * sc, oy = frei / 2 - CH / 2 + mh / 2 - (k.y + (KOPF.unten - KOPF.oben) / 2 * k.s) * sc; // Kopf waagrecht mittig, senkrecht mittig über dem Streifen
+    const lage = () => { const l = C / 2 - mw / 2 + ox, t = CH / 2 - mh / 2 + oy;
+      return { l, t, r: l + mw, b: t + mh, kl: l + (k.x - breit / 2) * sc, kr: l + (k.x + breit / 2) * sc, ko: t + (k.y - KOPF.oben * k.s) * sc, ku: t + (k.y + KOPF.unten * k.s) * sc }; };
+    // nur in der Richtung, in der das Foto den Tisch ganz füllen kann – sonst bliebe die Lücke auf der anderen Seite und der Kopf säße schief
+    let a = lage();
+    if (mh >= CH) { if (a.t > 0) oy -= Math.min(a.t, Math.max(0, a.ko - rand / 2)); else if (a.b < CH) oy += Math.min(CH - a.b, Math.max(0, frei - rand / 2 - a.ku)); }
+    a = lage();
+    if (mw >= C) { if (a.l > 0) ox -= Math.min(a.l, Math.max(0, a.kl - rand / 2)); else if (a.r < C) ox += Math.min(C - a.r, Math.max(0, C - rand / 2 - a.kr)); }
+    return { zoom: Math.round(zoom * 1000) / 1000, ox: Math.round(ox * 10) / 10, oy: Math.round(oy * 10) / 10 };
+  }
+  async function kopfAuto(knopf) {
+    const img = foto.img, s = foto.s, info = $('fotoKopfInfo'), kn = $('fotoKopf'); if (!img) return;
+    kn.disabled = true; info.textContent = 'Kopf wird gesucht …';
+    let kopf = null, fehler = null; try { kopf = await kopfFinden(img); } catch (e) { fehler = e; }
+    kn.disabled = false; if (foto.img !== img || foto.s !== s) return; // inzwischen ein anderes Bild
+    if (!kopf) { info.textContent = fehler ? 'Automatisch geht gerade nicht (' + (fehler.message || fehler) + ').' : 'Kein Gesicht gefunden – bitte von Hand einpassen.'; return; }
+    if (foto.angefasst && !knopf) { info.textContent = ''; return; } // inzwischen selbst verschoben: das gilt
+    Object.assign(foto, kopfZuschnitt(img, kopf, foto.streifen || 0.2)); foto.angefasst = false; fotoBegrenzen(); fotoZeichnen();
+    info.textContent = 'Kopf automatisch eingepasst.';
+  }
+  $('fotoKopf').addEventListener('click', () => kopfAuto(true));
+  // Alle Fotos der Klasse auf einmal (Menü „Mehr …“): Quelle ist das Original, sonst das bisherige Foto (wird dann zum Original, damit später nachgebessert
+  // werden kann). Von Hand eingepasste (zuschnitt.hand) bleiben, wie sie sind; ohne gefundenes Gesicht bleibt das Foto unverändert.
+  const bildLaden = (quelle) => new Promise((ok, nein) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => nein(new Error('Bild lässt sich nicht laden')); i.src = quelle; });
+  async function kopfAlleEinpassen() {
+    const d = kd(); if (!d) return;
+    const mitFoto = d.schueler.filter((s) => fotos.has(s.id)), liste = mitFoto.filter((s) => !(s.zuschnitt && s.zuschnitt.hand)), hand = mitFoto.length - liste.length;
+    if (!liste.length) { zeigeMeldung(hand ? 'Alle Fotos dieser Klasse sind von Hand eingepasst – nichts zu tun.' : 'In dieser Klasse gibt es noch keine Fotos.'); return; }
+    if (!confirm(liste.length + ' Fotos der Klasse „' + d.name + '“ automatisch einpassen: der ganze Kopf, das Feld ausgefüllt.' + (hand ? '\n' + hand + ' von Hand eingepasste bleiben, wie sie sind.' : '') + '\n\nWeiter?')) return;
+    const streifen = streifenAnteil(); let n = 0, ohne = 0, i = 0;
+    for (const s of liste) {
+      zeigeMeldung('Fotos werden eingepasst … ' + (++i) + ' von ' + liste.length);
+      const orig = await originalLaden(s.id);
+      let img = null; try { img = await bildLaden(orig || fotos.get(s.id)); } catch (e) { ohne++; continue; }
+      let k = null; try { k = await kopfFinden(img); } catch (e) { /* ohne Erkennung */ }
+      if (!k) { ohne++; continue; }
+      const z = kopfZuschnitt(img, k, streifen), out = document.createElement('canvas'); out.width = out.height = 400; zuschnittMalen(out.getContext('2d'), 400, img, z);
+      const daten = out.toDataURL('image/jpeg', 0.85);
+      try { await DB.schreib('fotos', s.id, daten); } catch (e) { ohne++; continue; }
+      if (!orig) originalMerken(s.id, originalVon(img));
+      s.zuschnitt = z; fotos.set(s.id, daten); moodleFoto(s.id, daten); n++;
+    }
+    zeichne();
+    zeigeMeldung(n + (n === 1 ? ' Foto' : ' Fotos') + ' automatisch eingepasst' + (ohne ? '; bei ' + ohne + ' kein Gesicht gefunden – bitte von Hand (Foto antippen)' : '') + '.');
+  }
   $('fotoSpeichern').addEventListener('click', async () => {
     if (!foto.img || !foto.s) return;
-    const out = document.createElement('canvas'); out.width = 400; out.height = 300; fotoMalen(out.getContext('2d'), 400); // 4 : 3 wie die Kachel (seit Stand .26)
+    const out = document.createElement('canvas'); out.width = 400; out.height = 400; fotoMalen(out.getContext('2d'), 400); // quadratisch wie der Tisch (seit Stand .30)
     const daten = out.toDataURL('image/jpeg', 0.85);
     try { await DB.schreib('fotos', foto.s.id, daten); } catch (e) { alert('Das Foto ließ sich nicht speichern: ' + (e && e.message || e)); return; }
     if (foto.origNeu) originalMerken(foto.s.id, originalVon(foto.img));
-    foto.s.zuschnitt = { zoom: foto.zoom, ox: Math.round(foto.ox * 10) / 10, oy: Math.round(foto.oy * 10) / 10 };
+    foto.s.zuschnitt = { zoom: Math.round(foto.zoom * 1000) / 1000, ox: Math.round(foto.ox * 10) / 10, oy: Math.round(foto.oy * 10) / 10 };
+    if (foto.angefasst) foto.s.zuschnitt.hand = true; // von Hand eingepasst: beim nächsten Öffnen nicht automatisch überschreiben
     fotos.set(foto.s.id, daten); moodleFoto(foto.s.id, daten); $('fotoDlg').close(); zeichne();
   });
   $('fotoLoeschen').addEventListener('click', async () => {
@@ -1337,7 +1499,7 @@
     await DB.loesch('fotos', foto.s.id).catch(() => {}); fotos.delete(foto.s.id); moodleFoto(foto.s.id, null);
     originalMerken(foto.s.id, null); delete foto.s.zuschnitt; $('fotoDlg').close(); zeichne();
   });
-  $('fotoDlg').addEventListener('close', () => { if (foto.url) { URL.revokeObjectURL(foto.url); foto.url = null; } foto.img = null; $('fotoCanvas').getContext('2d').clearRect(0, 0, C, CH); });
+  $('fotoDlg').addEventListener('close', () => { if (foto.url) { URL.revokeObjectURL(foto.url); foto.url = null; } foto.img = null; finger.clear(); geste = null; cv.getContext('2d').clearRect(0, 0, cv.width, cv.height); });
 
   // ---------- Bilder aus der Zwischenablage ----------
   // Knopf: liest die Zwischenablage (Safari auf dem iPad fragt mit „Einsetzen“ nach). Strg+V: über das paste-Ereignis unten.
@@ -1377,14 +1539,6 @@
     const passt = (teile) => teile.length > 0 && teile.every((x) => w.has(x));
     const treffer = schueler.filter((s) => passt(woerter(s.name)) || (s.mail && woerter(s.mail.split('@')[0]).length > 1 && passt(woerter(s.mail.split('@')[0]))));
     return treffer.length === 1 ? treffer[0].id : '';
-  }
-  // Quadratischer Ausschnitt, mittig; bei Hochformat etwas nach oben, dort sitzt meist das Gesicht.
-  function quadratBild(img, g = 320) {
-    const w = img.naturalWidth, h = img.naturalHeight, s = Math.min(w, h);
-    const x = (w - s) / 2, y = h > w ? (h - s) * 0.3 : (h - s) / 2;
-    const c = document.createElement('canvas'); c.width = c.height = g;
-    c.getContext('2d').drawImage(img, x, y, s, s, 0, 0, g, g);
-    return c.toDataURL('image/jpeg', 0.85);
   }
   let fotosNeu = []; // { url, name, img, sid, fehler }
   function fotosLeeren() { for (const f of fotosNeu) URL.revokeObjectURL(f.url); fotosNeu = []; }
@@ -1437,14 +1591,18 @@
     if (ersetzt && !confirm((ersetzt === 1 ? 'Ein Schüler hat' : ersetzt + ' Schüler haben') + ' schon ein Foto. Ersetzen?')) return;
     let n = 0;
     const d = kd();
+    const streifen = streifenAnteil();
     for (const f of bereit) {
-      const daten = quadratBild(f.img);
+      // Kopf automatisch einpassen (seit Stand .30); ohne gefundenes Gesicht wie bisher: quadratisch, mittig, bei Hochformat 30 % von oben
+      const w = f.img.naturalWidth, h = f.img.naturalHeight, sk = Math.min(w, h), s = d && d.schueler.find((x) => x.id === f.sid);
+      let z = null; try { const k = await kopfFinden(f.img); if (k) z = kopfZuschnitt(f.img, k, streifen); } catch (e) { /* ohne Erkennung */ }
+      if (!z) z = { zoom: 1, ox: 0, oy: h > w ? Math.round((h - sk) * 0.2 * (C / sk) * 10) / 10 : 0 };
+      const out = document.createElement('canvas'); out.width = out.height = 400; zuschnittMalen(out.getContext('2d'), 400, f.img, z);
+      const daten = out.toDataURL('image/jpeg', 0.85);
       try { await DB.schreib('fotos', f.sid, daten); } catch (e) { alert('Ein Foto ließ sich nicht speichern: ' + (e && e.message || e)); break; }
       fotos.set(f.sid, daten); moodleFoto(f.sid, daten); n++;
-      // Original + derselbe Ausschnitt wie quadratBild (mittig, Hochformat 30 % von oben) als Einstellung → später nachbessern
-      originalMerken(f.sid, originalVon(f.img));
-      const w = f.img.naturalWidth, h = f.img.naturalHeight, sk = Math.min(w, h), s = d && d.schueler.find((x) => x.id === f.sid);
-      if (s) s.zuschnitt = { zoom: 1, ox: 0, oy: h > w ? Math.round((h - sk) * 0.2 * (C / sk) * 10) / 10 : 0 };
+      originalMerken(f.sid, originalVon(f.img)); // Original + Einstellung → später nachbessern
+      if (s) s.zuschnitt = z;
     }
     $('fotosDlg').close(); zeichne();
     zeigeMeldung(n + (n === 1 ? ' Foto' : ' Fotos') + ' übernommen. Den Ausschnitt kannst du über das Foto des Schülers nachbessern.');
@@ -1842,6 +2000,7 @@
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
   }
-  window.__klassenApp = { stand: STAND, zustand: () => st, fotoAnzahl: () => fotos.size, bildVerkleinern, moodle: IN_MOODLE, speichereJetzt: () => moodleSpeichern(), fehlzeitenUebernehmen, fehlzeiten: (klasse, id) => fehlzeiten(id, st.klassen[klasse]) };
+  window.__klassenApp = { stand: STAND, zustand: () => st, fotoAnzahl: () => fotos.size, bildVerkleinern, moodle: IN_MOODLE, speichereJetzt: () => moodleSpeichern(), fehlzeitenUebernehmen, fehlzeiten: (klasse, id) => fehlzeiten(id, st.klassen[klasse]),
+    zuschnitt: () => ({ zoom: foto.zoom, ox: foto.ox, oy: foto.oy, angefasst: !!foto.angefasst, streifen: foto.streifen, bild: !!foto.img }) };
   start();
 })();

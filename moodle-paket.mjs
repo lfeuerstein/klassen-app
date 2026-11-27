@@ -4,6 +4,7 @@
 //  - app.js und app.css mit „?v=<STAND>“: Moodle liefert unter jeder alten Revisionsadresse (…/content/<n>/) schon die neuen
 //    Dateien aus, Browser speichern sie aber 6 Stunden zwischen. Ohne Anhang passten neue Seite und altes Programm nicht
 //    zusammen (27.11.2026: Knopf „Klasse aus SHK City …“ ohne Wirkung in Firefox).
+//  - pico.js + facefinder.bin (Gesichtserkennung, MIT) unverändert; app.js lädt sie bei Bedarf mit „?v=<STAND>“
 //  - Icons unverändert, kein Service Worker (die Moodle-Fassung braucht beim Start Moodle).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -28,5 +29,6 @@ fs.mkdirSync(path.join(ziel, 'icons'), { recursive: true });
 fs.writeFileSync(path.join(ziel, 'index.html'), html);
 fs.copyFileSync(path.join(quelle, 'app.js'), path.join(ziel, 'app.js'));
 fs.copyFileSync(path.join(quelle, 'app.css'), path.join(ziel, 'app.css'));
+for (const f of ['pico.js', 'facefinder.bin']) fs.copyFileSync(path.join(quelle, f), path.join(ziel, f)); // Gesichtserkennung für den automatischen Zuschnitt (seit Stand .30, lädt app.js mit ?v=)
 for (const f of ['icon-180.png', 'icon-192.png', 'icon-512.png']) fs.copyFileSync(path.join(quelle, 'icons', f), path.join(ziel, 'icons', f));
 console.log('Moodle-Paket Stand ' + stand + ' in ' + ziel + ' (ohne Manifest, app.js/app.css mit ?v=' + stand + ')');
