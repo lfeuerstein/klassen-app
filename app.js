@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-21.1';
+  const STAND = '2026-11-27.3';
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
   const WFARBE = { '++': 'var(--w1)', '+': 'var(--w2)', 'o': 'var(--w3)', '-': 'var(--w4)', '--': 'var(--w5)' };
   const ZEIG = (w) => w.replace(/-/g, '−');
@@ -239,7 +239,7 @@
     zug = { k, id: k.dataset.id, x0: e.clientX, y0: e.clientY, bewegt: false };
   });
   document.addEventListener('pointermove', (e) => {
-    if (!zug || modus !== 'bearbeiten') return;
+    if (!zug) return; // Ziehen geht in beiden Betriebsarten (Wunsch 27.11.): Bild auf Bild = Plätze tauschen
     if (!zug.bewegt && Math.hypot(e.clientX - zug.x0, e.clientY - zug.y0) < 8) return;
     if (!zug.bewegt) { zug.bewegt = true; zug.geist = zug.k.cloneNode(true); zug.geist.classList.add('geist'); document.body.append(zug.geist); zug.k.classList.add('wird-gezogen'); }
     zug.geist.style.left = e.clientX + 'px'; zug.geist.style.top = e.clientY + 'px'; markiere(zielUnter(e.clientX, e.clientY));
@@ -255,6 +255,8 @@
     else {
       const neu = ziel.dataset.platz; if (neu === alt) return;
       const dort = d.plaetze[neu]; if (alt) delete d.plaetze[alt]; d.plaetze[neu] = z.id; if (dort && alt) d.plaetze[alt] = dort;
+      const name = (id) => (d.schueler.find((s) => s.id === id) || {}).name || '?';
+      if (dort) zeigeMeldung(alt ? name(z.id) + ' und ' + name(dort) + ' haben die Plätze getauscht.' : name(z.id) + ' sitzt jetzt auf dem Platz von ' + name(dort) + '; ' + name(dort) + ' liegt in der Ablage.');
     }
     zeichne();
   };
@@ -280,7 +282,7 @@
     const zu = e.target.closest('[data-zu]'); if (zu) { zu.closest('dialog').close(); return; }
     const a = e.target.closest('[data-aktion]'); if (!a) return;
     const offen = a.closest('dialog'); if (offen) offen.close();
-    ({ import: importOeffnen, klassen: klassenOeffnen, kriterien: kriterienOeffnen, sichern: sicherungSpeichern,
+    ({ import: importOeffnen, fotos: fotosOeffnen, klassen: klassenOeffnen, kriterien: kriterienOeffnen, sichern: sicherungSpeichern,
        laden: () => $('sicherungDatei').click(), beispiel: beispielAnlegen })[a.dataset.aktion]();
   });
   $('menueKnopf').addEventListener('click', () => $('menueDlg').showModal());
@@ -484,6 +486,26 @@
     dateiAbgeben('moodle-' + sauber(kd().name) + '-' + sauber(sp) + '-' + datum + '.csv', '﻿' + zeilen.join('\r\n'), 'text/csv');
   });
 
+  // ---------- Große Bilder gleich beim Einlesen verkleinern ----------
+  // Zwischenablage, Kamera (12 Megapixel) oder große Dateien: längste Seite höchstens 1600 Pixel, sonst wird das iPad langsam.
+  // Gespeichert wird ohnehin nur ein Ausschnitt mit 320 × 320 Pixeln.
+  const MAX_KANTE = 1600, MAX_BYTES = 2 * 1024 * 1024;
+  function bildVerkleinern(datei) {
+    return new Promise((res) => {
+      const url = URL.createObjectURL(datei), img = new Image();
+      img.onload = () => {
+        const w = img.naturalWidth, h = img.naturalHeight, k = Math.min(1, MAX_KANTE / Math.max(w, h));
+        if (k === 1 && datei.size <= MAX_BYTES) { URL.revokeObjectURL(url); res(datei); return; }
+        const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
+        const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        c.toBlob((b) => res(b ? new File([b], String(datei.name || 'Bild').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' }) : datei), 'image/jpeg', 0.9);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); res(datei); };
+      img.src = url;
+    });
+  }
+
   // ---------- Foto aufnehmen, zuschneiden, speichern ----------
   const C = 600;
   const foto = { s: null, img: null, url: null, zoom: 1, ox: 0, oy: 0 };
@@ -494,7 +516,8 @@
   $('fotoKameraKnopf').addEventListener('click', () => $('fotoKamera').click());
   $('fotoDateiKnopf').addEventListener('click', () => $('fotoDatei').click());
   for (const inp of [$('fotoKamera'), $('fotoDatei')]) inp.addEventListener('change', () => { const f = inp.files && inp.files[0]; inp.value = ''; if (f) fotoLaden(f); });
-  function fotoLaden(datei) {
+  async function fotoLaden(datei) {
+    datei = await bildVerkleinern(datei);
     if (foto.url) URL.revokeObjectURL(foto.url);
     foto.url = URL.createObjectURL(datei);
     const img = new Image();
@@ -530,6 +553,113 @@
     await DB.loesch('fotos', foto.s.id).catch(() => {}); fotos.delete(foto.s.id); $('fotoDlg').close(); zeichne();
   });
   $('fotoDlg').addEventListener('close', () => { if (foto.url) { URL.revokeObjectURL(foto.url); foto.url = null; } foto.img = null; $('fotoCanvas').getContext('2d').clearRect(0, 0, C, C); });
+
+  // ---------- Bilder aus der Zwischenablage ----------
+  // Knopf: liest die Zwischenablage (Safari auf dem iPad fragt mit „Einsetzen“ nach). Strg+V: über das paste-Ereignis unten.
+  async function bilderAusZwischenablage() {
+    if (!navigator.clipboard || !navigator.clipboard.read) return [];
+    const bilder = [];
+    for (const t of await navigator.clipboard.read()) {
+      const typ = t.types.find((x) => x.startsWith('image/'));
+      if (typ) bilder.push(await t.getType(typ));
+    }
+    return bilder;
+  }
+  async function zwischenablageNach(ziel) {
+    let bilder = [];
+    try { bilder = await bilderAusZwischenablage(); } catch (e) { bilder = []; }
+    if (!bilder.length) {
+      alert('Kein Bild in der Zwischenablage gefunden.\n\nAm Notebook: Bild kopieren und hier Strg+V drücken.\nAm iPad: Foto in „Fotos“ öffnen, Teilen › „Kopieren“, dann hier „Aus Zwischenablage einfügen“ und „Einsetzen“ tippen.');
+      return;
+    }
+    ziel(bilder);
+  }
+  const alsDatei = (b, i) => (b instanceof File ? b : new File([b], 'Zwischenablage ' + i + '.' + (String(b.type).split('/')[1] || 'png'), { type: b.type }));
+  $('fotoEinfuegenKnopf').addEventListener('click', () => zwischenablageNach((b) => fotoLaden(b[0])));
+  document.addEventListener('paste', (e) => {
+    const cd = e.clipboardData; if (!cd) return;
+    const dateien = [...(cd.items || [])].filter((i) => i.kind === 'file' && i.type.startsWith('image/')).map((i) => i.getAsFile()).filter(Boolean);
+    if (!dateien.length) return;
+    if ($('fotoDlg').open) { e.preventDefault(); fotoLaden(dateien[0]); } else if ($('fotosDlg').open) { e.preventDefault(); fotosHinzu(dateien.map((d, i) => alsDatei(d, fotosNeu.length + i + 1))); }
+  });
+
+  // ---------- Viele Fotos auf einmal hochladen und zuordnen ----------
+  const falte = (t) => String(t).toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const woerter = (t) => falte(t).split(/[^a-z0-9]+/).filter((w) => w.length > 1);
+  // Ordnet eine Datei einem Schüler zu, wenn alle Namensteile (oder die Teile vor dem @ der E-Mail-Adresse) im Dateinamen stehen – nur bei genau einem Treffer.
+  function schuelerZuDatei(dateiname, schueler) {
+    const w = new Set(woerter(String(dateiname).replace(/\.[a-z0-9]+$/i, '')));
+    const passt = (teile) => teile.length > 0 && teile.every((x) => w.has(x));
+    const treffer = schueler.filter((s) => passt(woerter(s.name)) || (s.mail && woerter(s.mail.split('@')[0]).length > 1 && passt(woerter(s.mail.split('@')[0]))));
+    return treffer.length === 1 ? treffer[0].id : '';
+  }
+  // Quadratischer Ausschnitt, mittig; bei Hochformat etwas nach oben, dort sitzt meist das Gesicht.
+  function quadratBild(img, g = 320) {
+    const w = img.naturalWidth, h = img.naturalHeight, s = Math.min(w, h);
+    const x = (w - s) / 2, y = h > w ? (h - s) * 0.3 : (h - s) / 2;
+    const c = document.createElement('canvas'); c.width = c.height = g;
+    c.getContext('2d').drawImage(img, x, y, s, s, 0, 0, g, g);
+    return c.toDataURL('image/jpeg', 0.85);
+  }
+  let fotosNeu = []; // { url, name, img, sid, fehler }
+  function fotosLeeren() { for (const f of fotosNeu) URL.revokeObjectURL(f.url); fotosNeu = []; }
+  function fotosOeffnen() {
+    if (!kd()) { alert('Bitte zuerst eine Klasse anlegen oder aus Moodle übernehmen.'); return; }
+    fotosLeeren(); zeichneFotosListe(); $('fotosDlg').showModal();
+  }
+  async function fotosHinzu(dateien) {
+    const d = kd(); if (!d) return;
+    for (const roh of dateien) {
+      if (!roh || !String(roh.type).startsWith('image/')) continue;
+      const f = await bildVerkleinern(roh);
+      if (!$('fotosDlg').open) return;
+      const e = { url: URL.createObjectURL(f), name: roh.name || 'Bild', img: null, sid: schuelerZuDatei(roh.name || '', d.schueler), fehler: false };
+      const img = new Image();
+      img.onload = () => { e.img = img; zeichneFotosListe(); };
+      img.onerror = () => { e.fehler = true; zeichneFotosListe(); };
+      img.src = e.url; fotosNeu.push(e);
+    }
+    zeichneFotosListe();
+  }
+  function zeichneFotosListe() {
+    const d = kd(), liste = $('fotosListe'); liste.innerHTML = '';
+    if (!d) return;
+    if (!fotosNeu.length) liste.innerHTML = '<p class="leise" style="margin:0">Noch keine Fotos gewählt.</p>';
+    const vergeben = new Map(); for (const f of fotosNeu) if (f.sid) vergeben.set(f.sid, (vergeben.get(f.sid) || 0) + 1);
+    const sortiert = d.schueler.slice().sort((a, b) => a.name.localeCompare(b.name, 'de'));
+    fotosNeu.forEach((f, i) => {
+      const z = document.createElement('div'); z.className = 'foto-zeile' + (f.sid && vergeben.get(f.sid) > 1 ? ' doppelt' : '');
+      const b = document.createElement('img'); b.src = f.url; b.alt = ''; z.appendChild(b);
+      const n = document.createElement('div'); n.className = 'foto-datei'; n.textContent = f.fehler ? f.name + ' – lässt sich nicht öffnen' : f.name; z.appendChild(n);
+      const sel = document.createElement('select'); sel.disabled = f.fehler; sel.setAttribute('aria-label', 'Schüler für ' + f.name);
+      sel.appendChild(new Option('– nicht zuordnen –', ''));
+      for (const s of sortiert) sel.appendChild(new Option(s.name + (fotos.has(s.id) ? ' (hat schon ein Foto)' : ''), s.id));
+      sel.value = f.sid; sel.addEventListener('change', () => { f.sid = sel.value; zeichneFotosListe(); }); z.appendChild(sel);
+      const x = document.createElement('button'); x.textContent = '✕'; x.title = 'Aus der Liste nehmen';
+      x.addEventListener('click', () => { URL.revokeObjectURL(f.url); fotosNeu.splice(i, 1); zeichneFotosListe(); }); z.appendChild(x);
+      liste.appendChild(z);
+    });
+    const bereit = fotosNeu.filter((f) => f.sid && f.img).length, doppelt = [...vergeben.values()].some((v) => v > 1);
+    $('fotosInfo').textContent = fotosNeu.length ? bereit + ' von ' + fotosNeu.length + ' zugeordnet' + (doppelt ? ' · ein Name ist doppelt gewählt' : '') : '';
+    $('fotosUebernehmen').disabled = !bereit || doppelt;
+  }
+  $('fotosWaehlen').addEventListener('click', () => $('fotosDateien').click());
+  $('fotosDateien').addEventListener('change', () => { const f = [...$('fotosDateien').files]; $('fotosDateien').value = ''; fotosHinzu(f); });
+  $('fotosEinfuegen').addEventListener('click', () => zwischenablageNach((b) => fotosHinzu(b.map((x, i) => alsDatei(x, fotosNeu.length + i + 1)))));
+  $('fotosUebernehmen').addEventListener('click', async () => {
+    const bereit = fotosNeu.filter((f) => f.sid && f.img);
+    const ersetzt = bereit.filter((f) => fotos.has(f.sid)).length;
+    if (ersetzt && !confirm((ersetzt === 1 ? 'Ein Schüler hat' : ersetzt + ' Schüler haben') + ' schon ein Foto. Ersetzen?')) return;
+    let n = 0;
+    for (const f of bereit) {
+      const daten = quadratBild(f.img);
+      try { await DB.schreib('fotos', f.sid, daten); } catch (e) { alert('Ein Foto ließ sich nicht speichern: ' + (e && e.message || e)); break; }
+      fotos.set(f.sid, daten); n++;
+    }
+    $('fotosDlg').close(); zeichne();
+    zeigeMeldung(n + (n === 1 ? ' Foto' : ' Fotos') + ' übernommen. Den Ausschnitt kannst du über das Foto des Schülers nachbessern.');
+  });
+  $('fotosDlg').addEventListener('close', fotosLeeren);
 
   // ---------- Sicherung ----------
   async function sicherungSpeichern() {
@@ -579,6 +709,6 @@
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
   }
-  window.__klassenApp = { stand: STAND, zustand: () => st, fotoAnzahl: () => fotos.size };
+  window.__klassenApp = { stand: STAND, zustand: () => st, fotoAnzahl: () => fotos.size, bildVerkleinern };
   start();
 })();

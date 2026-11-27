@@ -67,7 +67,8 @@ body.bearbeiten .platz .nr { display: block; }
   display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 7px 4px; border-radius: 12px;
   background: var(--flaeche); border: 2px solid var(--linie); position: relative;
 }
-body.bearbeiten .karte { cursor: grab; touch-action: none; }
+.karte { touch-action: none; } /* Ziehen auf dem iPad in beiden Betriebsarten */
+body.bearbeiten .karte { cursor: grab; }
 .karte.gewaehlt { border-color: var(--akzent); box-shadow: 0 0 0 3px var(--akzent-weich); }
 .karte.blitz { animation: blitz .5s; }
 @keyframes blitz { 0% { background: var(--ziel); } 100% { background: var(--flaeche); } }
@@ -141,6 +142,13 @@ th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--lini
 .menue button { text-align: left; }
 .versteckt { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .foto-wahl { display: flex; gap: 10px; flex-wrap: wrap; }
+.fotos-liste { display: grid; gap: 6px; }
+.foto-zeile { display: grid; grid-template-columns: 56px minmax(0, 1fr) minmax(170px, 260px) auto; gap: 8px; align-items: center; padding: 4px; border-radius: 9px; }
+.foto-zeile img { width: 56px; height: 56px; object-fit: cover; border-radius: 50%; background: var(--linie); }
+.foto-zeile .foto-datei { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.foto-zeile select { min-height: 40px; }
+.foto-zeile.doppelt { outline: 2px solid var(--w5); }
+@media (max-width: 620px) { .foto-zeile { grid-template-columns: 56px minmax(0, 1fr) auto; } .foto-zeile select { grid-column: 2 / 3; } }
 .zuschnitt { display: grid; gap: 10px; justify-items: center; }
 .zuschnitt canvas { width: min(100%, 380px); aspect-ratio: 1; border-radius: 12px; touch-action: none; background: #000; }
 .zuschnitt label { display: flex; gap: 8px; align-items: center; width: min(100%, 380px); }

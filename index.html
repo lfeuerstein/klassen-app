@@ -68,6 +68,7 @@
   <div class="dk"><h3>Mehr</h3></div>
   <div class="di menue">
     <button data-aktion="import">Teilnehmer aus Moodle übernehmen …</button>
+    <button data-aktion="fotos">Fotos hochladen und zuordnen …</button>
     <button data-aktion="klassen">Klassen und Schüler verwalten …</button>
     <button data-aktion="kriterien">Kriterien der Projektkompetenz …</button>
     <button data-aktion="sichern">Sicherung speichern (alle Klassen, Fotos und Bewertungen)</button>
@@ -151,6 +152,7 @@
     <div class="foto-wahl">
       <button id="fotoKameraKnopf" class="haupt">Foto aufnehmen</button>
       <button id="fotoDateiKnopf">Bild wählen …</button>
+      <button id="fotoEinfuegenKnopf">Aus Zwischenablage einfügen</button>
       <input type="file" id="fotoKamera" accept="image/*" capture="environment" class="versteckt">
       <input type="file" id="fotoDatei" accept="image/*" class="versteckt">
     </div>
@@ -159,9 +161,25 @@
       <label>Größe <input type="range" id="fotoZoom" min="1" max="4" step="0.01" value="1"></label>
       <p class="leise" style="margin:0">Mit dem Finger verschieben, bis das Gesicht im Kreis sitzt.</p>
     </div>
-    <p class="leise" style="margin:0">Das Foto bleibt nur auf diesem Gerät.</p>
+    <p class="leise" style="margin:0">Am Notebook geht auch Strg+V. Das Foto bleibt nur auf diesem Gerät.</p>
   </div>
   <div class="df"><button id="fotoLoeschen" class="gefahr links">Foto entfernen</button><button data-zu>Abbrechen</button><button id="fotoSpeichern" class="haupt" disabled>Speichern</button></div>
+</dialog>
+
+<!-- Viele Fotos auf einmal -->
+<dialog id="fotosDlg">
+  <div class="dk"><h3>Fotos hochladen und zuordnen</h3></div>
+  <div class="di">
+    <div class="anleitung"><b>So kommen die Fotos in die App:</b>
+      <ol><li>„Fotos wählen …“ und alle Fotos der Klasse auf einmal markieren – oder ein kopiertes Bild mit „Aus Zwischenablage einfügen“ holen (am Notebook auch Strg+V).</li>
+      <li>Heißt eine Datei wie der Schüler, etwa „Anna Becker.jpg“ oder „becker_anna.jpg“, ordnet die App sie selbst zu. Sonst den Namen rechts wählen.</li>
+      <li>„Übernehmen“. Den Ausschnitt setzt die App mittig; nachbessern lässt er sich über das Foto des Schülers.</li></ol>
+    </div>
+    <div class="zeile"><button id="fotosWaehlen" class="haupt">Fotos wählen …</button><button id="fotosEinfuegen">Aus Zwischenablage einfügen</button>
+      <input type="file" id="fotosDateien" accept="image/*" multiple class="versteckt"></div>
+    <div id="fotosListe" class="fotos-liste"></div>
+  </div>
+  <div class="df"><span id="fotosInfo" class="links leise"></span><button data-zu>Abbrechen</button><button id="fotosUebernehmen" class="haupt" disabled>Übernehmen</button></div>
 </dialog>
 
 <input type="file" id="sicherungDatei" accept=".json,application/json" class="versteckt">
