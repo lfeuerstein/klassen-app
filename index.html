@@ -41,7 +41,8 @@
       <h2>Noch keine Klasse</h2>
       <p class="leise">Lege eine Klasse an. Die Namen kommen am einfachsten aus der Teilnehmerliste des Moodle-Kurses.</p>
       <div class="zeile">
-        <button class="haupt nur-moodle" data-aktion="moodleKlasse">Klasse aus einem Moodle-Kurs …</button>
+        <button class="haupt nur-moodle" data-aktion="shkKlasse">Klasse aus SHK City …</button>
+        <button class="nur-moodle" data-aktion="moodleKlasse">Anderer Moodle-Kurs …</button>
         <button class="haupt nicht-moodle" data-aktion="import">Teilnehmer aus Moodle …</button>
         <button data-aktion="klassen">Klasse von Hand anlegen …</button>
         <button data-aktion="beispiel">Beispielklasse zum Ausprobieren</button>
@@ -75,7 +76,8 @@
 <dialog id="menueDlg">
   <div class="dk"><h3>Mehr</h3></div>
   <div class="di menue">
-    <button data-aktion="moodleKlasse" class="nur-moodle">Klasse aus einem Moodle-Kurs übernehmen …</button>
+    <button data-aktion="shkKlasse" class="nur-moodle">Klasse aus SHK City (Gruppen) …</button>
+    <button data-aktion="moodleKlasse" class="nur-moodle">Klasse aus einem anderen Moodle-Kurs …</button>
     <button data-aktion="import">Teilnehmer aus Moodle übernehmen (CSV-Datei) …</button>
     <button data-aktion="fotos">Fotos hochladen und zuordnen …</button>
     <button data-aktion="klassen">Klassen und Schüler verwalten …</button>
@@ -201,6 +203,21 @@
     <div id="fotosListe" class="fotos-liste"></div>
   </div>
   <div class="df"><span id="fotosInfo" class="links leise"></span><button data-zu>Abbrechen</button><button id="fotosUebernehmen" class="haupt" disabled>Übernehmen</button></div>
+</dialog>
+
+<!-- Klasse aus SHK City: Gruppen (globale Gruppen) des Kurses 3193 (Wunsch 27.11.2026) -->
+<dialog id="shkDlg">
+  <div class="dk"><h3>Klasse aus SHK City</h3></div>
+  <div class="di">
+    <p class="leise" style="margin:0">Die Klassen im Moodle-Kurs „SHK City“ (globale Gruppen). Antippen legt die Klasse an. Gibt es sie schon, kommen nur
+      neue Schüler dazu – Bewertungen, Sitzplan und Fotos bleiben.</p>
+    <div id="shkListe" class="shk-liste"></div>
+    <p id="shkInfo" class="leise" style="margin:0"></p>
+  </div>
+  <div class="df">
+    <button data-aktion="moodleKlasse" class="links">Anderer Moodle-Kurs …</button>
+    <button data-zu>Schließen</button><button id="shkAlle" class="haupt" disabled>Alle anlegen</button>
+  </div>
 </dialog>
 
 <!-- Moodle-Fassung: Klasse aus einem Moodle-Kurs (nur bewertbare Teilnehmer, wahlweise eine Gruppe) -->

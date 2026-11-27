@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.13';
+  const STAND = '2026-11-27.14';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -487,7 +487,7 @@
     const a = e.target.closest('[data-aktion]'); if (!a) return;
     const offen = a.closest('dialog'); if (offen) offen.close();
     ({ import: importOeffnen, fotos: fotosOeffnen, klassen: klassenOeffnen, kriterien: kriterienOeffnen, sichern: sicherungSpeichern,
-       laden: () => $('sicherungDatei').click(), beispiel: beispielAnlegen, moodleKlasse: mkOeffnen })[a.dataset.aktion]();
+       laden: () => $('sicherungDatei').click(), beispiel: beispielAnlegen, moodleKlasse: mkOeffnen, shkKlasse: shkOeffnen })[a.dataset.aktion]();
   });
   $('menueKnopf').addEventListener('click', () => $('menueDlg').showModal());
 
@@ -1120,6 +1120,8 @@
   $('mkZiel').addEventListener('change', () => { $('mkNeuName').hidden = !!$('mkZiel').value; });
   const mkNutzer = (d) => (d.users || []).map((u) => ({ mid: u.id, name: ((u.firstname || '') + ' ' + (u.lastname || '')).trim() || u.fullname, mail: u.email || '',
     bild: /\/user\/icon\//.test(u.profileimageurl || '') ? u.profileimageurl : '' }));
+  // „1BFSHK1 (2026/27) Globale Gruppe“ → „1BFSHK1“
+  const kurzName = (n) => n.replace(/\s*Globale Gruppe\s*$/i, '').replace(/\s*\(\d{4}\/\d{2}\)\s*$/, '').trim() || n;
   // Schüler aus Moodle in Klasse d übernehmen: Vorhandene (gleiche Moodle-Nummer oder E-Mail) werden aktualisiert, Bewertungen bleiben.
   function schuelerUebernehmen(d, liste) {
     const neu = []; let schonDa = 0;
@@ -1146,7 +1148,6 @@
     const kurs = Number($('mkKurs').value), gruppen = [...$('mkGruppe').options].filter((o) => o.value !== '0');
     if (!gruppen.length) return;
     $('mkAlle').disabled = true; $('mkUebernehmen').disabled = true;
-    const kurzName = (n) => n.replace(/\s*Globale Gruppe\s*$/i, '').replace(/\s*\(\d{4}\/\d{2}\)\s*$/, '').trim() || n;
     const bericht = []; let erste = null;
     try {
       for (const o of gruppen) {
@@ -1166,6 +1167,49 @@
     } catch (e) { $('mkVorschau').textContent = moodleFehler(e); }
     $('mkAlle').disabled = false; $('mkUebernehmen').disabled = !mkListe.length;
   });
+
+  // ---------- Klasse aus SHK City (Wunsch 27.11.2026: „für die Anlage der Klasse einfach die Gruppen nehmen aus SHK City“) ----------
+  // Kurs 3193 „SHK City“ enthält alle Klassen als globale Gruppen („1BFSHK1 (2026/27) Globale Gruppe“). Die Herkunft steht in d.quelle;
+  // d.kurs bleibt der Kurs, in den die Noten gehen („Nach Moodle …“) – sonst schlüge die App SHK City als Notenkurs vor.
+  const SHK_KURS = 3193;
+  let shkGruppen = [];
+  const shkKlasseVon = (g) => klassenSortiert().find((id) => { const k = st.klassen[id];
+    return (k.quelle && k.quelle.kurs === SHK_KURS && k.quelle.gruppe === g.id) || (k.kurs === SHK_KURS && k.gruppe === g.id) || k.name.trim().toLowerCase() === g.name.toLowerCase(); });
+  async function shkOeffnen() {
+    $('shkListe').innerHTML = ''; $('shkInfo').textContent = 'Klassen werden aus SHK City geladen …'; $('shkAlle').disabled = true; $('shkDlg').showModal();
+    try {
+      const neu = [];
+      for (const x of (await MO.ajax('core_group_get_course_groups', { courseid: SHK_KURS })) || []) {
+        const liste = mkNutzer(await MO.ajax('core_grades_get_enrolled_users_for_selector', { courseid: SHK_KURS, groupid: x.id }));
+        if (liste.length) neu.push({ id: x.id, name: kurzName(x.name), liste });
+      }
+      shkGruppen = neu.sort((a, b) => a.name.localeCompare(b.name, 'de'));
+      shkZeichnen();
+    } catch (e) { $('shkInfo').textContent = moodleFehler(e); }
+  }
+  function shkZeichnen() {
+    const l = $('shkListe'); l.innerHTML = '';
+    for (const g of shkGruppen) {
+      const da = shkKlasseVon(g), b = document.createElement('button'), n = document.createElement('b'), z = document.createElement('span');
+      n.textContent = g.name; z.className = 'leise'; z.textContent = g.liste.length + ' Schüler · ' + (da ? 'schon da – ergänzen' : 'neu anlegen');
+      b.append(n, z); b.addEventListener('click', () => shkAnlegen([g])); l.append(b);
+    }
+    $('shkInfo').textContent = shkGruppen.length ? '' : 'Im Kurs „SHK City“ gibt es keine Gruppe mit Schülern.';
+    $('shkAlle').disabled = !shkGruppen.length;
+  }
+  function shkAnlegen(gruppen) {
+    const bericht = []; let erste = null;
+    for (const g of gruppen) {
+      const da = shkKlasseVon(g);
+      if (da) st.klasse = da; else klasseAnlegen(g.name);
+      const d = kd(); d.quelle = { kurs: SHK_KURS, gruppe: g.id };
+      const z = schuelerUebernehmen(d, g.liste); erste = erste || st.klasse;
+      bericht.push(g.name + ': ' + (da ? 'ergänzt, ' + z.neu + ' neu' : 'neu, ' + g.liste.length + ' Schüler'));
+    }
+    if (erste) st.klasse = erste;
+    gewaehlt = null; $('shkDlg').close(); zeichne(); zeigeMeldung(bericht.join(' · '));
+  }
+  $('shkAlle').addEventListener('click', () => shkAnlegen(shkGruppen));
 
   // Noten direkt in einen Bewertungsaspekt eintragen – wie in Moodle unter Bewertungen › Einzelansicht von Hand
   async function mdVorbereiten() {

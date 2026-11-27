@@ -78,6 +78,9 @@ body.eng .anw-leiste > .leise, body.eng .werkzeug .nur-bearbeiten > .leise:last-
 @container (max-width: 64px) { .platz .bild { width: min(84cqw, var(--bild-max, 140px)); font-size: min(28cqw, calc(var(--bild-max, 140px) * .33)); } }
 /* Kopfleiste auf dem iPad quer in einer Zeile halten */
 @media (max-width: 1200px) { .app-name, .werkzeug .lbl { display: none; } #klasse { max-width: 200px; } }
+/* Klasse aus SHK City (Wunsch 27.11.2026) */
+.shk-liste { display: grid; gap: 8px; }
+.shk-liste button { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; text-align: left; min-height: 48px; }
 /* Vollbild (Wunsch 27.11.2026) */
 #vollbildKnopf { padding: 8px 11px; display: inline-grid; place-items: center; }
 #vollbildKnopf.an { background: var(--akzent-weich); border-color: var(--akzent); color: var(--akzent); }
