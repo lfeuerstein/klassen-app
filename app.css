@@ -53,9 +53,47 @@ body.bearbeiten .ablage-box.nur-bearbeiten { display: block !important; }
 
 .haupt-bereich { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: 0; }
 .raum { padding: 14px; overflow: auto; }
-.tafel { background: var(--tafel); color: #e8f1ea; text-align: center; border-radius: 8px; padding: 6px; font-size: 12px; letter-spacing: .05em; margin: 0 auto 14px; max-width: 420px; }
-.plaetze { display: grid; gap: 10px; }
-.platz { min-height: 108px; border: 2px dashed transparent; border-radius: 12px; background: var(--platz); display: flex; align-items: center; justify-content: center; position: relative; }
+.tafel { background: var(--tafel); color: #e8f1ea; text-align: center; border-radius: 8px; padding: 6px; font-size: 12px; letter-spacing: .05em; margin: 14px auto 0; max-width: 420px; }
+:root { --gang-schmal: 10px; --gang-tippen: 22px; --gang-breit: 46px; }
+.plaetze { display: grid; gap: 0; }
+.platz { min-height: 120px; padding: 5px; border: 2px dashed transparent; border-radius: 12px; background: var(--platz); display: flex; align-items: center; justify-content: center; position: relative; }
+/* Größere Bilder (Wunsch 27.11.2026): die Karte füllt den Platz, Bild und Name wachsen mit */
+.platz .karte { width: 100%; max-width: 210px; container-type: inline-size; }
+.platz .bild { width: 64cqw; height: auto; aspect-ratio: 1; max-width: 140px; font-size: 21cqw; }
+.platz .name { font-size: clamp(12px, 9cqw, 16px); }
+/* Durchgänge zwischen den Tischen */
+.gang { border-radius: 6px; }
+.gang.an { background: repeating-linear-gradient(45deg, transparent 0 7px, var(--linie) 7px 9px); }
+.gang.kreuz { border-radius: 0; }
+body.bearbeiten .gang[data-gang] { cursor: pointer; }
+body.bearbeiten .gang-s:not(.an) { background: linear-gradient(var(--grau), var(--grau)) center / 2px 70% no-repeat; }
+body.bearbeiten .gang-r:not(.an) { background: linear-gradient(var(--grau), var(--grau)) center / 70% 2px no-repeat; }
+body.bearbeiten .gang[data-gang]:hover { background-color: var(--akzent-weich); }
+body.bearbeiten .gang[data-gang].an { box-shadow: inset 0 0 0 2px var(--akzent); }
+/* Anwesenheit */
+.nur-anwesenheit { display: none !important; }
+body.anwesenheit .nur-anwesenheit { display: flex !important; }
+.anw-leiste { gap: 10px; align-items: center; flex-wrap: wrap; margin: 0 0 12px; }
+.anw { display: none; }
+body.anwesenheit .anw { display: grid; place-items: center; position: absolute; top: -9px; right: -9px; min-width: 30px; height: 30px; padding: 0 7px; border-radius: 15px; color: #fff; font-weight: 700; font-size: 15px; background: var(--grau); box-shadow: 0 1px 3px rgba(0,0,0,.25); white-space: nowrap; z-index: 2; }
+body.anwesenheit .anw-da .anw { background: var(--gruen); }
+body.anwesenheit .anw-weg .anw { background: var(--w5); }
+body.anwesenheit .anw-spaet .anw { background: var(--w4); font-size: 13px; }
+body.anwesenheit .punkt { display: none; }
+body.anwesenheit .karte.anw-weg { opacity: .55; }
+body.anwesenheit .karte.anw-offen { border-style: dashed; }
+.anw-wahl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.anw-wahl button.an.anw-da { background: var(--gruen); border-color: var(--gruen); color: #fff; }
+.anw-wahl button.an.anw-spaet { background: var(--w4); border-color: var(--w4); color: #fff; }
+.anw-wahl button.an.anw-weg { background: var(--w5); border-color: var(--w5); color: #fff; }
+.anw-wahl input[type=time] { min-height: 40px; font-size: 16px; }
+.zeile .schalter input { flex: none; min-width: 0; }
+table.untis { width: 100%; border-collapse: collapse; font-size: 15px; }
+table.untis th, table.untis td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--linie); }
+table.untis tr.u-weg td { color: var(--w5); font-weight: 600; }
+table.untis tr.u-spaet td { color: var(--w4); font-weight: 600; }
+table.untis tr.u-offen td { color: var(--leise); font-style: italic; }
+#untisNamen { width: 100%; font: inherit; padding: 8px; border-radius: 8px; border: 1px solid var(--linie); background: var(--flaeche); color: var(--text); }
 body.bearbeiten .platz { border-color: var(--linie); }
 .platz.ziel, .ablage.ziel { border-color: var(--gruen) !important; background: var(--ziel); }
 .platz .nr { position: absolute; top: 3px; left: 6px; font-size: 10px; color: var(--leise); display: none; }
@@ -80,6 +118,7 @@ body.bearbeiten .karte { cursor: grab; }
 .punkt { position: absolute; top: 6px; right: 8px; width: 11px; height: 11px; border-radius: 50%; background: var(--grau); }
 .punkt.heute { background: var(--gruen); }
 .punkt.abwesend { background: var(--w5); }
+.punkt.spaet { background: var(--w4); }
 .note { position: absolute; top: -8px; left: -6px; background: var(--akzent); color: #fff; font-size: 11px; font-weight: 700; border-radius: 10px; padding: 1px 6px; display: none; }
 body.noten-zeigen .note.da { display: block; }
 

@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.3';
+  const STAND = '2026-11-27.7';
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
   const WFARBE = { '++': 'var(--w1)', '+': 'var(--w2)', 'o': 'var(--w3)', '-': 'var(--w4)', '--': 'var(--w5)' };
   const ZEIG = (w) => w.replace(/-/g, '−');
@@ -63,6 +63,25 @@
   const komma = (x) => x.toFixed(1).replace('.', ',');
   const tag = (d) => new Date(d).toDateString();
   const platzVon = (id) => { const d = kd(); return d ? Object.keys(d.plaetze).find((p) => d.plaetze[p] === id) : undefined; };
+
+  // Anwesenheit (Wunsch 27.11.2026): je Klasse und Tag { schülerId: { s: 'da' | 'spaet' | 'weg', t: 'HH:MM' bei spaet } }.
+  // Nur Notiz des Lehrers – offiziell bleibt WebUntis.
+  const zwei = (n) => String(n).padStart(2, '0');
+  const tagKey = (t = new Date()) => t.getFullYear() + '-' + zwei(t.getMonth() + 1) + '-' + zwei(t.getDate());
+  const uhrzeit = (t = new Date()) => zwei(t.getHours()) + ':' + zwei(t.getMinutes());
+  const anwTag = (d, tk = tagKey()) => ((d && d.anwesenheit) || {})[tk] || {};
+  const anwHeute = (id) => anwTag(kd())[id] || null;
+  function anwSetzen(id, s, t) {
+    const d = kd(); if (!d) return;
+    d.anwesenheit = d.anwesenheit || {}; const tk = tagKey(); const tg = (d.anwesenheit[tk] = d.anwesenheit[tk] || {});
+    if (!s) delete tg[id]; else tg[id] = { s, t: s === 'spaet' ? (t || uhrzeit()) : null, um: Date.now() };
+  }
+  const anwSumme = (id) => {
+    let weg = 0, spaet = 0;
+    for (const tg of Object.values((kd() && kd().anwesenheit) || {})) { const e = tg[id]; if (e && e.s === 'weg') weg++; if (e && e.s === 'spaet') spaet++; }
+    return { weg, spaet };
+  };
+  const ANW_FOLGE = { offen: 'da', da: 'weg', weg: 'spaet', spaet: 'da' };
   const eintraege = (id, zeitraum) => {
     const l = (kd() && kd().protokoll[id]) || [];
     if (zeitraum === 'heute') return l.filter((e) => tag(e.zeit) === tag(Date.now()));
@@ -92,7 +111,7 @@
   }
   function klasseAnlegen(name) {
     const id = neueId('k');
-    st.klassen[id] = { name: name.trim() || 'Neue Klasse', reihen: 5, spalten: 6, schueler: [], plaetze: {}, protokoll: {} };
+    st.klassen[id] = { name: name.trim() || 'Neue Klasse', reihen: 5, spalten: 6, schueler: [], plaetze: {}, protokoll: {}, anwesenheit: {}, gaenge: {} };
     st.klasse = id; return id;
   }
   const klassenSortiert = () => Object.keys(st.klassen).sort((a, b) => st.klassen[a].name.localeCompare(st.klassen[b].name, 'de'));
@@ -111,11 +130,15 @@
   function karte(s) {
     const k = document.createElement('div'); k.className = 'karte' + (s.id === gewaehlt ? ' gewaehlt' : ''); k.dataset.id = s.id; k.title = s.name;
     const n = document.createElement('div'); n.className = 'name'; n.textContent = s.name;
-    const heute = eintraege(s.id, 'heute');
-    const p = document.createElement('div'); p.className = 'punkt' + (heute.some((e) => e.abw) ? ' abwesend' : heute.length ? ' heute' : '');
+    const heute = eintraege(s.id, 'heute'), a = anwHeute(s.id);
+    k.classList.add('anw-' + (a ? a.s : 'offen'));
+    const p = document.createElement('div');
+    p.className = 'punkt' + ((a && a.s === 'weg') || (!a && heute.some((e) => e.abw)) ? ' abwesend' : a && a.s === 'spaet' ? ' spaet' : heute.length ? ' heute' : '');
     const no = document.createElement('div'); const nv = noteVon(s.id, 'alle').note;
     no.className = 'note' + (nv === null ? '' : ' da'); no.textContent = nv === null ? '' : komma(nv);
-    k.append(bildEl(s), n, p, no); return k;
+    const an = document.createElement('div'); an.className = 'anw';
+    an.textContent = !a ? '?' : a.s === 'da' ? '✓' : a.s === 'weg' ? '✕' : '🕘 ' + a.t;
+    k.append(bildEl(s), n, p, no, an); return k;
   }
 
   function zeichneKlassenwahl() {
@@ -133,7 +156,17 @@
     $('start').hidden = !!d; $('sitzplan').hidden = !d;
     if (!d) { gewaehlt = null; document.body.classList.remove('seite-offen'); zeichneSeite(); zeichneFuss(); return; }
     $('reihen').value = d.reihen; $('spalten').value = d.spalten;
-    plaetzeEl.style.gridTemplateColumns = 'repeat(' + d.spalten + ', minmax(108px, 1fr))';
+    // Raster: Tischspalten und -reihen, dazwischen Streifen. Jedes Streifenstück zwischen zwei Tischen ist einzeln ein Durchgang oder
+    // nicht – so kann ein Gang auch versetzt verlaufen oder nur einen Teil abdecken (Wunsch 27.11.2026). Ein Streifen mit mindestens
+    // einem Gangstück wird insgesamt breiter, damit die Tische bündig bleiben. Sicht des Lehrers: Reihe 1 (vorn, an der Tafel) unten.
+    const ga = gaengeVon(d);
+    const sBreit = (c) => Object.keys(ga).some((k) => k.startsWith('s' + c + ':'));
+    const rBreit = (r) => Object.keys(ga).some((k) => k.startsWith('r' + r + ':'));
+    const spur = (gang) => (gang ? 'var(--gang-breit)' : modus === 'bearbeiten' ? 'var(--gang-tippen)' : 'var(--gang-schmal)');
+    const sp = [], rp = [];
+    for (let c = 1; c <= d.spalten; c++) { sp.push('minmax(92px, 1fr)'); if (c < d.spalten) sp.push(spur(sBreit(c))); }
+    for (let v = 1; v <= d.reihen; v++) { rp.push('auto'); if (v < d.reihen) rp.push(spur(rBreit(d.reihen - v))); }
+    plaetzeEl.style.gridTemplateColumns = sp.join(' '); plaetzeEl.style.gridTemplateRows = rp.join(' ');
     plaetzeEl.innerHTML = '';
     for (const p of Object.keys(d.plaetze)) {
       const [r, c] = p.slice(1).split('p').map(Number);
@@ -141,9 +174,23 @@
     }
     for (let r = 1; r <= d.reihen; r++) for (let c = 1; c <= d.spalten; c++) {
       const id = 'r' + r + 'p' + c, el = document.createElement('div'); el.className = 'platz'; el.dataset.platz = id;
+      el.style.gridRow = String(2 * (d.reihen - r + 1) - 1); el.style.gridColumn = String(2 * c - 1);
       const nr = document.createElement('span'); nr.className = 'nr'; nr.textContent = r + '.' + c; el.append(nr);
       const sid = d.plaetze[id]; if (sid && finde(sid)) el.append(karte(finde(sid)));
       plaetzeEl.append(el);
+    }
+    const zeileVon = (r) => String(2 * (d.reihen - r + 1) - 1), zwischenZeile = (r) => String(2 * (d.reihen - r));
+    for (let c = 1; c < d.spalten; c++) for (let r = 1; r <= d.reihen; r++) {
+      const k = 's' + c + ':' + r; plaetzeEl.append(gangEl(k, !!ga[k], zeileVon(r), String(2 * c), 'zwischen Platz ' + r + '.' + c + ' und ' + r + '.' + (c + 1)));
+    }
+    for (let r = 1; r < d.reihen; r++) for (let c = 1; c <= d.spalten; c++) {
+      const k = 'r' + r + ':' + c; plaetzeEl.append(gangEl(k, !!ga[k], zwischenZeile(r), String(2 * c - 1), 'zwischen Platz ' + r + '.' + c + ' und ' + (r + 1) + '.' + c));
+    }
+    // Kreuzungen füllen, wenn zwei der vier angrenzenden Stücke Gang sind (geradeaus oder um die Ecke)
+    for (let c = 1; c < d.spalten; c++) for (let r = 1; r < d.reihen; r++) {
+      const n = ['s' + c + ':' + r, 's' + c + ':' + (r + 1), 'r' + r + ':' + c, 'r' + r + ':' + (c + 1)].filter((k) => ga[k]).length;
+      const x = document.createElement('div'); x.className = 'gang kreuz' + (n >= 2 ? ' an' : '');
+      x.style.gridRow = zwischenZeile(r); x.style.gridColumn = String(2 * c); plaetzeEl.append(x);
     }
     ablageEl.innerHTML = '';
     const frei = schueler().filter((s) => !platzVon(s.id)).sort((a, b) => a.name.localeCompare(b.name, 'de'));
@@ -154,9 +201,40 @@
     zeichneSeite(); zeichneFuss(); sichern();
   }
 
+  // Durchgänge je Klasse: { 's<c>:<r>': true } = zwischen Platz c und c+1 in Reihe r; { 'r<r>:<c>': true } = zwischen Reihe r und r+1 bei Platz c.
+  function gaengeVon(d) {
+    if (!d.gaenge) d.gaenge = {};
+    for (const c of d.gangSpalten || []) for (let r = 1; r <= d.reihen; r++) d.gaenge['s' + c + ':' + r] = true; // Form vom Vormittag übernehmen
+    for (const r of d.gangReihen || []) for (let c = 1; c <= d.spalten; c++) d.gaenge['r' + r + ':' + c] = true;
+    delete d.gangSpalten; delete d.gangReihen;
+    for (const k of Object.keys(d.gaenge)) {
+      const m = /^([sr])(\d+):(\d+)$/.exec(k), a = m ? Number(m[2]) : 0, b = m ? Number(m[3]) : 0;
+      const gilt = m && (m[1] === 's' ? a < d.spalten && b <= d.reihen : a < d.reihen && b <= d.spalten);
+      if (!gilt) delete d.gaenge[k];
+    }
+    return d.gaenge;
+  }
+  // Streifenstück zwischen zwei Tischen; in „Sitzplan bearbeiten“ schaltet Antippen genau dieses Stück als Durchgang ein oder aus.
+  function gangEl(schluessel, an, zeile, spalte, wo) {
+    const g = document.createElement('div'); g.className = 'gang gang-' + schluessel[0] + (an ? ' an' : '');
+    g.style.gridRow = zeile; g.style.gridColumn = spalte; g.dataset.gang = schluessel;
+    g.title = (an ? 'Durchgang entfernen: ' : 'Durchgang: ') + wo;
+    return g;
+  }
+  plaetzeEl.addEventListener('click', (e) => {
+    const g = e.target.closest('.gang[data-gang]'); if (!g || modus !== 'bearbeiten') return;
+    const ga = gaengeVon(kd()), k = g.dataset.gang; if (ga[k]) delete ga[k]; else ga[k] = true;
+    zeichne();
+  });
+
   function zeichneFuss() {
     const heute = schueler().filter((s) => eintraege(s.id, 'heute').some((e) => e.w)).length;
     $('heuteZahl').textContent = kd() ? 'Heute bewertet: ' + heute + ' von ' + schueler().length : '';
+    const tg = anwTag(kd()), zahl = { da: 0, spaet: 0, weg: 0 };
+    for (const s of schueler()) { const e = tg[s.id]; if (e) zahl[e.s]++; }
+    const offen = schueler().length - zahl.da - zahl.spaet - zahl.weg;
+    $('anwText').textContent = kd() ? zahl.da + ' anwesend · ' + zahl.spaet + ' später gekommen · ' + zahl.weg + ' fehlen · ' + offen + ' offen' : '';
+    $('anwDatum').textContent = new Date().toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
     const hatDaten = Object.values(st.klassen).some((k) => Object.values(k.protokoll).some((l) => l.length));
     const h = $('sicherungHinweis'); h.className = ''; h.textContent = '';
     if (hatDaten) {
@@ -203,12 +281,28 @@
     zb.querySelector('button').addEventListener('click', notiere);
     inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') notiere(); });
     seite.append(zb);
+    // Anwesenheit heute (ersetzt den alten Knopf „abwesend“); aktiven Knopf erneut tippen = zurück auf „offen“
+    const a = anwHeute(s.id), sum = anwSumme(s.id);
+    const aw = document.createElement('div'); aw.className = 'anw-wahl';
+    const al = document.createElement('b'); al.textContent = 'Heute:'; aw.append(al);
+    for (const [w, t] of [['da', 'anwesend'], ['spaet', 'später gekommen'], ['weg', 'abwesend']]) {
+      const bt = document.createElement('button'); bt.textContent = t; bt.className = 'anw-' + w + (a && a.s === w ? ' an' : '');
+      bt.addEventListener('click', () => { anwSetzen(s.id, a && a.s === w ? null : w); zeichne(); }); aw.append(bt);
+    }
+    if (a && a.s === 'spaet') {
+      const lb = document.createElement('label'); lb.textContent = 'um ';
+      const ti = document.createElement('input'); ti.type = 'time'; ti.value = a.t || ''; ti.id = 'anwZeit';
+      ti.addEventListener('change', () => { if (ti.value) { anwSetzen(s.id, 'spaet', ti.value); zeichne(); } });
+      lb.append(ti, ' Uhr'); aw.append(lb);
+    }
+    const as = document.createElement('div'); as.className = 'leise'; as.style.fontSize = '13px';
+    as.textContent = 'Bisher ' + sum.weg + '× gefehlt, ' + sum.spaet + '× später gekommen' + (a ? '' : ' · heute noch nicht erfasst');
+    seite.append(aw, as);
     const z2 = document.createElement('div'); z2.className = 'zeile';
-    const ab = document.createElement('button'); ab.textContent = 'abwesend'; ab.addEventListener('click', () => eintragen({ text: 'abwesend', abw: true }));
     const fo = document.createElement('button'); fo.textContent = fotos.has(s.id) ? 'Foto ändern' : 'Foto aufnehmen'; fo.addEventListener('click', () => fotoOeffnen(s));
     const rk = document.createElement('button'); rk.textContent = '↶ Letzten Eintrag zurück'; rk.disabled = !(kd().protokoll[s.id] || []).length;
     rk.addEventListener('click', () => { const l = kd().protokoll[s.id]; if (l && l.length) l.pop(); zeichne(); });
-    z2.append(ab, fo, rk); seite.append(z2);
+    z2.append(fo, rk); seite.append(z2);
     const pr = document.createElement('div'); pr.className = 'protokoll';
     const l = (kd().protokoll[s.id] || []).slice().reverse();
     if (!l.length) pr.innerHTML = '<span class="leise">Protokoll: noch keine Einträge.</span>';
@@ -246,7 +340,15 @@
   });
   const ende = (e) => {
     if (!zug) return; const z = zug; zug = null;
-    if (!z.bewegt) { if (e.type === 'pointerup' && modus === 'bewerten') { gewaehlt = z.id; zeichne(); } return; }
+    if (!z.bewegt) {
+      if (e.type !== 'pointerup') return;
+      if (modus === 'bewerten') { gewaehlt = z.id; zeichne(); }
+      else if (modus === 'anwesenheit') {
+        const a = anwHeute(z.id); anwSetzen(z.id, ANW_FOLGE[a ? a.s : 'offen']); zeichne();
+        const k = document.querySelector('#plaetze .karte[data-id="' + z.id + '"], #ablage .karte[data-id="' + z.id + '"]'); if (k) k.classList.add('blitz');
+      }
+      return;
+    }
     z.geist.remove(); z.k.classList.remove('wird-gezogen');
     const ziel = e.type === 'pointerup' ? zielUnter(e.clientX, e.clientY) : null; markiere(null);
     if (!ziel) return;
@@ -267,8 +369,63 @@
   document.querySelectorAll('.modus button').forEach((b) => b.addEventListener('click', () => {
     modus = b.dataset.m; document.querySelectorAll('.modus button').forEach((x) => x.classList.toggle('an', x === b));
     document.body.classList.toggle('bearbeiten', modus === 'bearbeiten');
-    if (modus === 'bearbeiten') { gewaehlt = null; zeichne(); }
+    document.body.classList.toggle('anwesenheit', modus === 'anwesenheit');
+    if (modus !== 'bewerten') gewaehlt = null;
+    zeichne();
   }));
+  $('anwAlleDa').addEventListener('click', () => {
+    const d = kd(); if (!d) return; let n = 0;
+    for (const s of d.schueler) if (!anwHeute(s.id)) { anwSetzen(s.id, 'da'); n++; }
+    zeichne(); zeigeMeldung(n + ' Schüler als anwesend eingetragen.');
+  });
+
+  // ---------- Liste für WebUntis (Wunsch 27.11.2026): Anwesenheit in der Reihenfolge von WebUntis, zum Übertragen von Hand ----------
+  const nachname = (n) => { const t = n.trim().split(/\s+/); return t[t.length - 1] || n; };
+  const vorname = (n) => n.trim().split(/\s+/).slice(0, -1).join(' ');
+  const untisName = (s) => nachname(s.name) + (vorname(s.name) ? ', ' + vorname(s.name) : '');
+  function untisFolge(d) {
+    const nachN = d.schueler.slice().sort((a, b) => nachname(a.name).localeCompare(nachname(b.name), 'de') || a.name.localeCompare(b.name, 'de'));
+    const eigen = (d.untisReihenfolge || []).map((id) => d.schueler.find((s) => s.id === id)).filter(Boolean);
+    return eigen.concat(nachN.filter((s) => !eigen.includes(s)));
+  }
+  function untisZeilen() {
+    const d = kd(), tg = anwTag(d, $('untisTag').value), nur = $('untisNurAbw').checked;
+    return untisFolge(d).map((s, i) => {
+      const e = tg[s.id];
+      return { nr: i + 1, name: untisName(s), art: e ? e.s : 'offen', status: !e ? 'nicht erfasst' : e.s === 'da' ? 'anwesend' : e.s === 'weg' ? 'fehlt' : 'kam ' + e.t + ' Uhr' };
+    }).filter((z) => !nur || z.art !== 'da');
+  }
+  function zeichneUntis() {
+    const t = $('untisTabelle'), z = untisZeilen();
+    t.innerHTML = '<tr><th>Nr.</th><th>Name</th><th>Anwesenheit</th></tr>';
+    for (const r of z) { const tr = document.createElement('tr'); tr.className = 'u-' + r.art; for (const x of [r.nr, r.name, r.status]) { const td = document.createElement('td'); td.textContent = x; tr.append(td); } t.append(tr); }
+    if (!z.length) t.insertAdjacentHTML('beforeend', '<tr><td colspan="3" class="leise">Alle anwesend – in WebUntis ist nichts zu ändern.</td></tr>');
+  }
+  function untisOeffnen() {
+    const d = kd(); if (!d) return;
+    const tage = Object.keys(d.anwesenheit || {}).filter((t) => Object.keys(d.anwesenheit[t]).length).sort().reverse();
+    if (!tage.includes(tagKey())) tage.unshift(tagKey());
+    const sel = $('untisTag'); sel.innerHTML = '';
+    for (const t of tage) sel.append(new Option(new Date(t + 'T12:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) + (t === tagKey() ? ' (heute)' : ''), t));
+    $('untisNamen').value = '';
+    $('untisInfo').textContent = (d.untisReihenfolge || []).length ? 'Reihenfolge aus WebUntis ist gespeichert.' : 'Sortiert nach Nachnamen.';
+    zeichneUntis(); $('untisDlg').showModal();
+  }
+  $('untisKnopf').addEventListener('click', untisOeffnen);
+  $('untisTag').addEventListener('change', zeichneUntis); $('untisNurAbw').addEventListener('change', zeichneUntis);
+  $('untisKopieren').addEventListener('click', async () => {
+    const text = untisZeilen().map((r) => r.nr + '. ' + r.name + ' – ' + r.status).join('\n') || 'Alle anwesend.';
+    try { await navigator.clipboard.writeText(text); zeigeMeldung('Liste kopiert.'); } catch (e) { alert(text); }
+  });
+  $('untisUebernehmen').addEventListener('click', () => {
+    const d = kd(), zeilen = $('untisNamen').value.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+    const folge = [], rest = d.schueler.slice(); let unbekannt = 0;
+    for (const z of zeilen) { const id = schuelerZuDatei(z, rest); if (id) { folge.push(id); rest.splice(rest.findIndex((s) => s.id === id), 1); } else unbekannt++; }
+    if (!folge.length) { alert('Keinen Namen erkannt. Bitte je Zeile einen Namen einfügen, z. B. „Becker, Anna“.'); return; }
+    d.untisReihenfolge = folge; zeichne(); zeichneUntis();
+    $('untisInfo').textContent = folge.length + ' Namen erkannt' + (unbekannt ? ', ' + unbekannt + (unbekannt === 1 ? ' Zeile' : ' Zeilen') + ' ohne Treffer' : '') + (rest.length ? '; ' + rest.length + (rest.length === 1 ? ' Schüler fehlt' : ' Schüler fehlen') + ' in der Liste und ' + (rest.length === 1 ? 'steht' : 'stehen') + ' am Ende' : '') + '.';
+  });
+  $('untisZurueck').addEventListener('click', () => { const d = kd(); d.untisReihenfolge = []; zeichne(); zeichneUntis(); $('untisInfo').textContent = 'Sortiert nach Nachnamen.'; });
   const groesse = () => {
     const d = kd(); if (!d) return;
     d.reihen = Math.min(8, Math.max(1, Number($('reihen').value) || 5));

@@ -21,10 +21,11 @@
 <header class="werkzeug">
   <b class="app-name">Klassen-App</b>
   <label>Klasse <select id="klasse"></select></label>
-  <div class="modus"><button data-m="bewerten" class="an">Bewerten</button><button data-m="bearbeiten">Sitzplan bearbeiten</button></div>
+  <div class="modus"><button data-m="bewerten" class="an">Bewerten</button><button data-m="anwesenheit">Anwesenheit</button><button data-m="bearbeiten">Sitzplan bearbeiten</button></div>
   <span class="nur-bearbeiten">
     <label class="leise">Reihen <input type="number" id="reihen" min="1" max="8" inputmode="numeric"></label>
     <label class="leise">Plätze je Reihe <input type="number" id="spalten" min="2" max="10" inputmode="numeric"></label>
+    <span class="leise">Zwischen zwei Tische tippen: dieses Stück wird Durchgang (ein/aus)</span>
   </span>
   <div class="rechts">
     <label class="schalter"><input type="checkbox" id="notenZeigen"> Noten zeigen</label>
@@ -45,8 +46,13 @@
       </div>
     </div>
     <div id="sitzplan">
-      <div class="tafel">Tafel · Lehrerpult</div>
+      <div class="anw-leiste nur-anwesenheit">
+        <b id="anwDatum"></b><span id="anwText"></span><button id="anwAlleDa">Alle offenen: anwesend</button><button id="untisKnopf" class="haupt">Liste für WebUntis …</button>
+        <span class="leise">Antippen: ? → ✓ anwesend → ✕ fehlt → 🕘 kam später (Uhrzeit von jetzt). Uhrzeit ändern: in „Bewerten“ antippen.</span>
+      </div>
       <div class="plaetze" id="plaetze"></div>
+      <!-- Sicht des Lehrers (Wunsch 27.11.2026): Tafel und Lehrerpult unten, vorderste Reihe direkt darüber -->
+      <div class="tafel">Tafel · Lehrerpult</div>
       <div class="ablage-box nur-bearbeiten">
         <div class="leise" id="ablageTitel" style="margin-bottom:6px">Noch ohne Platz</div>
         <div class="ablage" id="ablage" data-ablage="1"></div>
@@ -58,7 +64,7 @@
 
 <footer class="fuss">
   <span id="heuteZahl"></span>
-  <span>● grün = heute bewertet · ● rot = heute abwesend</span>
+  <span>● grün = heute bewertet · ● rot = heute abwesend · ● orange = später gekommen</span>
   <span id="sicherungHinweis"></span>
   <span class="rechts"><span>Daten liegen nur auf diesem Gerät</span><span id="stand" class="leise"></span></span>
 </footer>
@@ -180,6 +186,26 @@
     <div id="fotosListe" class="fotos-liste"></div>
   </div>
   <div class="df"><span id="fotosInfo" class="links leise"></span><button data-zu>Abbrechen</button><button id="fotosUebernehmen" class="haupt" disabled>Übernehmen</button></div>
+</dialog>
+
+<!-- Liste für WebUntis: Anwesenheit am Ende der Stunde von Hand übertragen -->
+<dialog id="untisDlg">
+  <div class="dk"><h3>Anwesenheit für WebUntis</h3></div>
+  <div class="di">
+    <div class="zeile" style="align-items:center">
+      <label>Tag <select id="untisTag"></select></label>
+      <label class="schalter"><input type="checkbox" id="untisNurAbw" checked> nur Fehlende, später Gekommene und nicht Erfasste</label>
+      <button id="untisKopieren">Liste kopieren</button>
+    </div>
+    <table id="untisTabelle" class="untis"></table>
+    <details>
+      <summary>Reihenfolge wie in WebUntis …</summary>
+      <p class="leise">Ohne Angabe sortiert die App nach Nachnamen. Weicht WebUntis ab: dort die Schülerliste der Klasse markieren und kopieren, hier einfügen (je Zeile ein Name) und „Übernehmen“ tippen. Die Reihenfolge bleibt für diese Klasse gespeichert.</p>
+      <textarea id="untisNamen" rows="6" placeholder="Becker, Anna&#10;Brandt, Kai&#10;…"></textarea>
+      <div class="zeile" style="align-items:center"><button id="untisUebernehmen">Übernehmen</button><button id="untisZurueck">Zurück zur Sortierung nach Nachnamen</button><span id="untisInfo" class="leise"></span></div>
+    </details>
+  </div>
+  <div class="df"><button data-zu class="haupt">Schließen</button></div>
 </dialog>
 
 <input type="file" id="sicherungDatei" accept=".json,application/json" class="versteckt">
