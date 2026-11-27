@@ -260,3 +260,16 @@ body.mit-raumwahl .werkzeug { column-gap: 10px; }
 .stufe button { min-height: 36px; width: 36px; padding: 0; font-size: 20px; line-height: 1; }
 .stufe input[type=number] { width: 44px; text-align: center; -moz-appearance: textfield; appearance: textfield; }
 .stufe input[type=number]::-webkit-inner-spin-button, .stufe input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+/* Bearbeitungsstand (Wunsch 27.11.2026): eingebettete Perlenkette aus dem Stadtplan in der Seitenspalte, Zahl erledigter Perlen an den Karten */
+.modus .m-kurz { display: none; }
+@media (max-width: 1200px) { .modus .m-lang { display: none; } .modus .m-kurz { display: inline; } }
+.stand-box { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 320px; }
+.stand-box .stand-rahmen { flex: 1 1 auto; width: 100%; min-height: 320px; border: 0; background: #fff; border-radius: 8px; }
+.st-zahl { display: none; }
+body.stand .st-zahl { display: block; position: absolute; top: -9px; right: -9px; min-width: 30px; height: 24px; padding: 0 7px; border-radius: 12px; font-size: 13px; font-weight: 700;
+  line-height: 24px; text-align: center; color: #fff; background: var(--gruen); box-shadow: var(--schatten); }
+body.stand .st-zahl.z-haengt { background: var(--w4); }
+body.stand .st-zahl.z-bewertung { background: var(--akzent); }
+body.stand .st-zahl.z-fertig, body.stand .st-zahl.z-naechster { background: var(--w1); }
+body.stand .st-zahl.z-unterricht, body.stand .st-zahl.z-wartet, body.stand .st-zahl.z-unbekannt { background: var(--grau); color: var(--text); }
+body.stand .punkt, body.stand .haken { display: none; }

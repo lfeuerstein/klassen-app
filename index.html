@@ -22,7 +22,8 @@
   <b class="app-name">Klassen-App</b>
   <label><span class="lbl">Klasse</span> <select id="klasse"></select></label>
   <label id="raumWahlLabel" hidden title="Raum wählen (Sitzplan je Raum)"><span class="lbl">Raum</span> <select id="raumWahl"></select></label>
-  <div class="modus"><button data-m="bewerten" class="an">Bewerten</button><button data-m="anwesenheit">Anwesenheit</button><button data-m="bearbeiten">Sitzplan bearbeiten</button></div>
+  <!-- Bearbeitungsstand (Wunsch 27.11.2026); bei knapper Breite kurze Namen, damit die Kopfleiste auf dem iPad einzeilig bleibt -->
+  <div class="modus"><button data-m="bewerten" class="an">Bewerten</button><button data-m="anwesenheit">Anwesenheit</button><button data-m="stand" title="Bearbeitungsstand: Perlenkette je Schüler"><span class="m-lang">Bearbeitungsstand</span><span class="m-kurz">Stand</span></button><button data-m="bearbeiten" title="Sitzplan bearbeiten"><span class="m-lang">Sitzplan bearbeiten</span><span class="m-kurz">Sitzplan</span></button></div>
   <span class="nur-bearbeiten">
     <!-- − / + zum Antippen (Wunsch 27.11.2026: auf dem iPad gibt es keine Pfeile am Zahlenfeld); Knöpfe außerhalb von <label>, sonst löst ein Tipp auf den Text sie aus -->
     <span class="stufe"><span class="leise">Reihen</span><button type="button" data-feld="reihen" data-schritt="-1" aria-label="Eine Reihe weniger">−</button><input type="number" id="reihen" min="1" max="8" inputmode="numeric" aria-label="Reihen"><button type="button" data-feld="reihen" data-schritt="1" aria-label="Eine Reihe mehr">+</button></span>

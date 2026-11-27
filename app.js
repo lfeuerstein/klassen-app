@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.22';
+  const STAND = '2026-11-27.23';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -173,6 +173,9 @@
   // ---------- Zeichnen ----------
   let modus = 'bewerten', gewaehlt = null;
   const plaetzeEl = $('plaetze'), ablageEl = $('ablage'), seite = $('seite');
+  // Bearbeitungsstand: eingebettete Perlenkette (bleibt in der Seitenspalte stehen, damit sie nicht bei jedem Zeichnen neu lädt) und die Zahlen je Moodle-Konto
+  const standBox = document.createElement('div'); standBox.className = 'stand-box'; standBox.hidden = true;
+  let standDaten = null;
 
   function bildEl(s) {
     const b = document.createElement('div'); b.className = 'bild';
@@ -222,7 +225,12 @@
     no.className = 'note' + (nv === null ? '' : ' da'); no.textContent = nv === null ? '' : komma(nv);
     const an = document.createElement('div'); an.className = 'anw';
     an.textContent = !a ? '?' : a.s === 'da' ? '✓' : a.s === 'weg' ? '✕' : '🕘 ' + a.t;
-    k.append(bildEl(s), n, p, no, an); return k;
+    // Bearbeitungsstand (nur im Reiter „Bearbeitungsstand“ sichtbar): erledigte Perlen / alle Perlen der Teilstrecke, orange = hängt
+    const sz = document.createElement('div'); sz.className = 'st-zahl';
+    const sd = standDaten && s.mid ? standDaten.get(Number(s.mid)) : null;
+    if (sd) { sz.textContent = sd.erledigt + '/' + standDaten.perlen; sz.classList.add('z-' + sd.zustand); sz.title = sd.erledigt + ' von ' + standDaten.perlen + ' Perlen erledigt'; }
+    else sz.textContent = s.mid && !standDaten ? '…' : '–';
+    k.append(bildEl(s), n, p, no, an, sz); return k;
   }
 
   function zeichneKlassenwahl() {
@@ -383,9 +391,12 @@
   const notenZeigen = () => document.body.classList.contains('noten-zeigen');
   const offeneKriterien = new Set(); // aufgeklappte Eintragslisten „<Schüler>:<Kriterium>“ (nur in dieser Sitzung)
   function zeichneSeite() {
-    seite.innerHTML = '';
+    for (const c of [...seite.children]) if (c !== standBox) c.remove(); // die eingebettete Perlenkette bleibt stehen (sonst lädt sie jedes Mal neu)
+    if (standBox.parentNode !== seite) seite.append(standBox);
+    standBox.hidden = modus !== 'stand' || !kd();
     const s = gewaehlt && finde(gewaehlt);
-    if (!s) { seite.innerHTML = '<div class="leer">' + (kd() ? 'Ein Gesicht antippen,<br>um schnell zu bewerten.' : '') + '</div>'; return; }
+    if (modus === 'stand') { zeichneStandSeite(s); return; }
+    if (!s) { seite.insertAdjacentHTML('afterbegin', '<div class="leer">' + (kd() ? 'Ein Gesicht antippen,<br>um schnell zu bewerten.' : '') + '</div>'); return; }
     const nv = noteVon(s.id, 'alle');
     const kopf = document.createElement('div'); kopf.className = 'kopf';
     const b = bildEl(s); b.title = 'Foto aufnehmen oder ändern'; b.addEventListener('click', () => fotoOeffnen(s));
@@ -496,6 +507,56 @@
     seite.append(pr);
   }
 
+  // ---------- Bearbeitungsstand (Wunsch 27.11.2026: „… wenn ich den einzelnen Schüler anklicke, dann eben auch den Stand der jeweiligen Perlenkette sehe …
+  // noch einen Tab Bearbeitungsstand“ und „… als Perlenkette anzeigen, dass ich sehe, wie viele Perlen insgesamt jetzt bearbeitet sind.“) ----------
+  // Rechts steht die Einzelansicht aus „Wo steht wer?“ des Stadtplans von SHK City (Datei-Element 109712, ?einzel=<Klasse>) – dieselbe Rechnung wie dort, keine Kopie
+  // der Ketten-Regeln. Gleiche Moodle-Adresse → die App ruft window.__einzel der eingebetteten Seite direkt auf. Zuordnung über das Moodle-Konto (s.mid).
+  const STADTPLAN_CM = 109712;
+  let standRahmen = null, standKlasse = null, standTimer = null, standUrl = null;
+  async function standAdresse() {
+    if (!IN_MOODLE) return new URLSearchParams(location.search).get('stadtplan'); // außerhalb Moodle nur zum Testen
+    if (standUrl) return standUrl;
+    const r = await fetch('/mod/resource/view.php?id=' + STADTPLAN_CM, { credentials: 'same-origin' });
+    if (!/\/pluginfile\.php\//.test(r.url)) throw new Error('Stadtplan nicht gefunden');
+    return (standUrl = r.url.split('?')[0]);
+  }
+  const standApi = () => { try { return standRahmen && standRahmen.contentWindow && standRahmen.contentWindow.__einzel; } catch (_) { return null; } };
+  function standJetzt() { const api = standApi(), s = gewaehlt && finde(gewaehlt); if (api) api.zeige(s && s.mid ? s.mid : null); }
+  function standRahmenFuer(d) {
+    const kl = (d.quelle && d.quelle.name) || d.name;
+    if (standKlasse === kl) return;
+    standKlasse = kl; standDaten = null; standRahmen = null; clearInterval(standTimer);
+    standBox.innerHTML = '<p class="leise">Perlenkette wird geladen …</p>';
+    standAdresse().then((url) => {
+      if (standKlasse !== kl) return;
+      if (!url) { standBox.innerHTML = '<p class="leise">Den Bearbeitungsstand gibt es nur in der Moodle-Fassung der App – er kommt aus dem Stadtplan von SHK City.</p>'; return; }
+      const f = document.createElement('iframe'); f.className = 'stand-rahmen'; f.title = 'Perlenkette (Stadtplan SHK City)';
+      f.src = url + (url.includes('?') ? '&' : '?') + 'einzel=' + encodeURIComponent(kl) + '&t=' + Math.floor(Date.now() / 36e5); // &t: höchstens eine Stunde alter Zwischenspeicher
+      standBox.innerHTML = ''; standBox.append(f); standRahmen = f;
+      let n = 0;
+      standTimer = setInterval(() => { // warten, bis die Perlenkette gelesen ist; dann den Schüler zeigen und die Zahlen an die Karten
+        if (++n > 600 || standKlasse !== kl) { clearInterval(standTimer); return; }
+        const api = standApi(); if (!api) return;
+        standJetzt();
+        const a = api.alle(); if (!a) return;
+        clearInterval(standTimer); standDaten = new Map(a.schueler.map((x) => [Number(x.uid), x])); standDaten.perlen = a.perlen;
+        if (modus === 'stand') zeichne();
+      }, 500);
+    }).catch((e) => { standBox.innerHTML = '<p class="leise">Der Stadtplan ist gerade nicht erreichbar (' + ((e && e.message) || e) + ').</p>'; });
+  }
+  function zeichneStandSeite(s) {
+    const d = kd(); if (!d) return;
+    if (s) {
+      const kopf = document.createElement('div'); kopf.className = 'kopf';
+      const h = document.createElement('h2'); h.textContent = s.name;
+      const zu = document.createElement('button'); zu.className = 'zu'; zu.textContent = '✕'; zu.title = 'Schließen';
+      zu.addEventListener('click', () => { gewaehlt = null; zeichne(); });
+      kopf.append(bildEl(s), h, zu); seite.insertBefore(kopf, standBox);
+      if (!s.mid) { const p = document.createElement('p'); p.className = 'leise'; p.textContent = 'Ohne Moodle-Konto gibt es keinen Bearbeitungsstand (von Hand angelegt).'; seite.insertBefore(p, standBox); }
+    }
+    standRahmenFuer(d); standJetzt();
+  }
+
   function eintragen(e) {
     const p = kd().protokoll; (p[gewaehlt] = p[gewaehlt] || []).push(Object.assign({ zeit: Date.now() }, e));
     zeichne();
@@ -520,7 +581,7 @@
     if (!zug) return; const z = zug; zug = null;
     if (!z.bewegt) {
       if (e.type !== 'pointerup') return;
-      if (modus === 'bewerten') { gewaehlt = z.id; zeichne(); }
+      if (modus === 'bewerten' || modus === 'stand') { gewaehlt = z.id; zeichne(); }
       else if (modus === 'anwesenheit') {
         const a = anwHeute(z.id); anwSetzen(z.id, ANW_FOLGE[a ? a.s : 'offen']); zeichne();
         const k = document.querySelector('#plaetze .karte[data-id="' + z.id + '"], #ablage .karte[data-id="' + z.id + '"]'); if (k) k.classList.add('blitz');
@@ -548,7 +609,8 @@
     modus = b.dataset.m; document.querySelectorAll('.modus button').forEach((x) => x.classList.toggle('an', x === b));
     document.body.classList.toggle('bearbeiten', modus === 'bearbeiten');
     document.body.classList.toggle('anwesenheit', modus === 'anwesenheit');
-    if (modus !== 'bewerten') gewaehlt = null;
+    document.body.classList.toggle('stand', modus === 'stand');
+    if (modus !== 'bewerten' && modus !== 'stand') gewaehlt = null; // zwischen Bewerten und Bearbeitungsstand bleibt der Schüler gewählt
     zeichne();
   }));
   $('anwAlleDa').addEventListener('click', () => {
@@ -1477,7 +1539,7 @@
     for (const g of gruppen) {
       const da = shkKlasseVon(g);
       if (da) st.klasse = da; else klasseAnlegen(g.name);
-      const d = kd(); d.quelle = { kurs: SHK_KURS, gruppe: g.id };
+      const d = kd(); d.quelle = { kurs: SHK_KURS, gruppe: g.id, name: g.name }; // Name der Gruppe: für den Bearbeitungsstand (Klasse im Stadtplan)
       const z = schuelerUebernehmen(d, g.liste); erste = erste || st.klasse;
       bericht.push(g.name + ': ' + (da ? 'ergänzt, ' + z.neu + ' neu' : 'neu, ' + g.liste.length + ' Schüler'));
     }
