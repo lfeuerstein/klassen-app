@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.11';
+  const STAND = '2026-11-27.12';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -40,8 +40,16 @@
   const grundKriterien = () => [
     { id: 'k1', name: 'Selbstständigkeit', gewicht: 1 }, { id: 'k2', name: 'Teamarbeit', gewicht: 1 },
     { id: 'k3', name: 'Fachliche Umsetzung', gewicht: 2 }, { id: 'k4', name: 'Sorgfalt und Sicherheit', gewicht: 1 },
-    { id: 'k5', name: 'Präsentation', gewicht: 1 }];
-  const grund = () => ({ app: 'klassen-app', version: 1, klasse: null, kriterien: grundKriterien(), klassen: {}, letzteSicherung: null });
+    { id: 'k5', name: 'Präsentation', gewicht: 1 }, { id: 'k6', name: 'Soziales Verhalten', gewicht: 1 }];
+  const grund = () => ({ app: 'klassen-app', version: 2, klasse: null, kriterien: grundKriterien(), klassen: {}, letzteSicherung: null });
+  // Daten aus älteren Ständen nachrüsten. Version 2 (Wunsch 27.11.2026): Kriterium „Soziales Verhalten“ einmalig dazu –
+  // wer es danach im Menü löscht, bekommt es nicht wieder. Leere Kriterien zählen in der Note nicht mit (noteVon).
+  function nachruesten() {
+    if ((st.version || 1) < 2) {
+      if (!st.kriterien.some((k) => /soziales\s+verhalten/i.test(k.name))) st.kriterien.push({ id: 'k6', name: 'Soziales Verhalten', gewicht: 1 });
+      st.version = 2;
+    }
+  }
   let st = grund();
   const fotos = new Map();
 
@@ -135,8 +143,10 @@
     const n = document.createElement('div'); n.className = 'name'; n.textContent = s.name;
     const heute = eintraege(s.id, 'heute'), a = anwHeute(s.id);
     k.classList.add('anw-' + (a ? a.s : 'offen'));
+    // Punkt = Anwesenheit (grau offen, grün da, orange später, rot fehlt); blauer Haken = heute bewertet (Wunsch 27.11.2026)
     const p = document.createElement('div');
-    p.className = 'punkt' + ((a && a.s === 'weg') || (!a && heute.some((e) => e.abw)) ? ' abwesend' : a && a.s === 'spaet' ? ' spaet' : heute.length ? ' heute' : '');
+    p.className = 'punkt' + ((a && a.s === 'weg') || (!a && heute.some((e) => e.abw)) ? ' abwesend' : a && a.s === 'spaet' ? ' spaet' : a && a.s === 'da' ? ' da' : '');
+    if (heute.some((e) => !e.abw)) { const h = document.createElement('div'); h.className = 'haken'; h.textContent = '✓'; k.append(h); }
     const no = document.createElement('div'); const nv = noteVon(s.id, 'alle').note;
     no.className = 'note' + (nv === null ? '' : ' da'); no.textContent = nv === null ? '' : komma(nv);
     const an = document.createElement('div'); an.className = 'anw';
@@ -154,6 +164,7 @@
   }
 
   function zeichne() {
+    nachruesten();
     zeichneKlassenwahl();
     const d = kd();
     $('start').hidden = !!d; $('sitzplan').hidden = !d;
@@ -479,6 +490,19 @@
        laden: () => $('sicherungDatei').click(), beispiel: beispielAnlegen, moodleKlasse: mkOeffnen })[a.dataset.aktion]();
   });
   $('menueKnopf').addEventListener('click', () => $('menueDlg').showModal());
+
+  // ---------- Vollbild (Wunsch 27.11.2026) ----------
+  // iPad-Safari kann Vollbild für die ganze Seite; der Knopf erscheint nur, wo der Browser es anbietet. Zweites Tippen beendet es.
+  const vbAn = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  if (!(document.fullscreenEnabled || document.webkitFullscreenEnabled)) $('vollbildKnopf').hidden = true;
+  $('vollbildKnopf').addEventListener('click', () => {
+    const d = document, e = d.documentElement;
+    if (vbAn()) { const x = d.exitFullscreen || d.webkitExitFullscreen; if (x) x.call(d); return; }
+    const f = e.requestFullscreen || e.webkitRequestFullscreen; if (!f) return;
+    const r = f.call(e); if (r && r.catch) r.catch(() => zeigeMeldung('Vollbild ist hier nicht möglich.'));
+  });
+  const vbStand = () => { const an = vbAn(); $('vollbildKnopf').classList.toggle('an', an); $('vollbildKnopf').title = an ? 'Vollbild beenden' : 'Vollbild'; };
+  document.addEventListener('fullscreenchange', vbStand); document.addEventListener('webkitfullscreenchange', vbStand);
 
   // ---------- Klassen und Schüler ----------
   function klassenOeffnen() { zeichneKlassenDlg(); $('klassenDlg').showModal(); }

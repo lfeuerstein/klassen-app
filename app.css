@@ -77,7 +77,10 @@ body.eng .anw-leiste > .leise, body.eng .werkzeug .nur-bearbeiten > .leise:last-
 /* Schmale Karten (viele Plätze je Reihe): das Bild nimmt mehr von der Breite */
 @container (max-width: 64px) { .platz .bild { width: min(84cqw, var(--bild-max, 140px)); font-size: min(28cqw, calc(var(--bild-max, 140px) * .33)); } }
 /* Kopfleiste auf dem iPad quer in einer Zeile halten */
-@media (max-width: 1200px) { .app-name { display: none; } #klasse { max-width: 200px; } }
+@media (max-width: 1200px) { .app-name, .werkzeug .lbl { display: none; } #klasse { max-width: 200px; } }
+/* Vollbild (Wunsch 27.11.2026) */
+#vollbildKnopf { padding: 8px 11px; display: inline-grid; place-items: center; }
+#vollbildKnopf.an { background: var(--akzent-weich); border-color: var(--akzent); color: var(--akzent); }
 /* Durchgänge zwischen den Tischen */
 .gang { border-radius: 6px; }
 .gang.an { background: repeating-linear-gradient(45deg, transparent 0 7px, var(--linie) 7px 9px); }
@@ -136,7 +139,10 @@ body.bearbeiten .karte { cursor: grab; }
 .bild img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
 .name { font-size: 12px; text-align: center; line-height: 1.2; word-break: break-word; }
 .punkt { position: absolute; top: 6px; right: 8px; width: 11px; height: 11px; border-radius: 50%; background: var(--grau); }
-.punkt.heute { background: var(--gruen); }
+.punkt.da { background: var(--gruen); }
+.haken { position: absolute; top: 4px; left: 6px; width: 15px; height: 15px; border-radius: 50%; background: var(--akzent); color: #fff; font-size: 10px; font-weight: 700; line-height: 15px; text-align: center; }
+.legende .lp { font-size: 14px; } .legende .lp.da { color: var(--gruen); } .legende .lp.spaet { color: var(--w4); } .legende .lp.weg { color: var(--w5); }
+.legende .lh { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: var(--akzent); color: #fff; font-size: 9px; font-weight: 700; line-height: 14px; text-align: center; }
 .punkt.abwesend { background: var(--w5); }
 .punkt.spaet { background: var(--w4); }
 .note { position: absolute; top: -8px; left: -6px; background: var(--akzent); color: #fff; font-size: 11px; font-weight: 700; border-radius: 10px; padding: 1px 6px; display: none; }
@@ -160,8 +166,8 @@ body.noten-zeigen .note.da { display: block; }
 .kopf h2 { margin: 0; font-size: 18px; }
 .kopf .gesamt { margin-left: auto; text-align: right; }
 .kopf .gesamt b { font-size: 22px; display: block; }
-.kriterium { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--linie); }
-.kriterium .kn { font-weight: 600; font-size: 14px; }
+.kriterium { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--linie); }
+.kriterium .kn { font-weight: 600; font-size: 14px; -webkit-hyphens: auto; hyphens: auto; overflow-wrap: break-word; } /* „Selbstständigkeit“ schob die Knöpfe über den Rand (iPad 27.11.2026) */
 .kriterium .ks { font-size: 12px; color: var(--leise); }
 .werte { display: flex; gap: 5px; }
 .wert { width: 44px; height: 44px; min-height: 44px; padding: 0; font-weight: 700; font-size: 16px; color: #fff; border: 0; }

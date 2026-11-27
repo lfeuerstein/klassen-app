@@ -20,7 +20,7 @@
 <div id="banner" class="banner" hidden></div>
 <header class="werkzeug">
   <b class="app-name">Klassen-App</b>
-  <label>Klasse <select id="klasse"></select></label>
+  <label><span class="lbl">Klasse</span> <select id="klasse"></select></label>
   <div class="modus"><button data-m="bewerten" class="an">Bewerten</button><button data-m="anwesenheit">Anwesenheit</button><button data-m="bearbeiten">Sitzplan bearbeiten</button></div>
   <span class="nur-bearbeiten">
     <label class="leise">Reihen <input type="number" id="reihen" min="1" max="8" inputmode="numeric"></label>
@@ -29,6 +29,7 @@
   </span>
   <div class="rechts">
     <label class="schalter"><input type="checkbox" id="notenZeigen"> Noten zeigen</label>
+    <button id="vollbildKnopf" title="Vollbild" aria-label="Vollbild"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M1 6V1h5M12 1h5v5M17 12v5h-5M6 17H1v-5"/></svg></button>
     <button id="menueKnopf">Mehr …</button>
     <button id="exportKnopf" class="haupt">Nach Moodle …</button>
   </div>
@@ -65,7 +66,7 @@
 
 <footer class="fuss">
   <span id="heuteZahl"></span>
-  <span>● grün = heute bewertet · ● rot = heute abwesend · ● orange = später gekommen</span>
+  <span class="legende"><span class="lp da">●</span> anwesend · <span class="lp spaet">●</span> später gekommen · <span class="lp weg">●</span> fehlt · <span class="lh">✓</span> heute bewertet</span>
   <span id="sicherungHinweis"></span>
   <span class="rechts"><span id="speicherOrt">Daten liegen nur auf diesem Gerät</span><span id="stand" class="leise"></span></span>
 </footer>
