@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.14';
+  const STAND = '2026-11-27.15';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -746,8 +746,10 @@
     img.src = foto.url;
   }
   const fotoMass = () => { const i = foto.img, sc = Math.max(C / i.naturalWidth, C / i.naturalHeight) * foto.zoom; return { w: i.naturalWidth * sc, h: i.naturalHeight * sc }; };
-  const fotoBegrenzen = () => { const m = fotoMass(), mx = (m.w - C) / 2, my = (m.h - C) / 2; foto.ox = Math.max(-mx, Math.min(mx, foto.ox)); foto.oy = Math.max(-my, Math.min(my, foto.oy)); };
-  const fotoMalen = (ctx, g) => { const m = fotoMass(), f = g / C; ctx.drawImage(foto.img, (C / 2 - m.w / 2 + foto.ox) * f, (C / 2 - m.h / 2 + foto.oy) * f, m.w * f, m.h * f); };
+  // Größer als der Kreis: Bild deckt das Feld immer ab. Kleiner (Regler unter 1, Wunsch 27.11.2026 „auch kleiner über den Bildrand hinaus“):
+  // Bild bleibt ganz im Feld, der freie Rand wird weiß (auch im gespeicherten JPEG, sonst wäre er schwarz).
+  const fotoBegrenzen = () => { const m = fotoMass(), mx = Math.abs(m.w - C) / 2, my = Math.abs(m.h - C) / 2; foto.ox = Math.max(-mx, Math.min(mx, foto.ox)); foto.oy = Math.max(-my, Math.min(my, foto.oy)); };
+  const fotoMalen = (ctx, g) => { const m = fotoMass(), f = g / C; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, g, g); ctx.drawImage(foto.img, (C / 2 - m.w / 2 + foto.ox) * f, (C / 2 - m.h / 2 + foto.oy) * f, m.w * f, m.h * f); };
   function fotoZeichnen() {
     const ctx = $('fotoCanvas').getContext('2d'); ctx.clearRect(0, 0, C, C); fotoMalen(ctx, C);
     ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.rect(0, 0, C, C); ctx.arc(C / 2, C / 2, C / 2 - 4, 0, Math.PI * 2, true); ctx.fill('evenodd');
