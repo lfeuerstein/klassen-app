@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.28';
+  const STAND = '2026-11-27.29';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -105,6 +105,115 @@
     for (const tg of Object.values((kd() && kd().anwesenheit) || {})) { const e = tg[id]; if (e && e.s === 'weg') weg++; if (e && e.s === 'spaet') spaet++; }
     return { weg, spaet };
   };
+  // Fehlzeiten der Vergangenheit (seit Stand .29, Wunsch 27.11.2026 abends: „… trage die Fehlzeiten in die Klassen-App ein, so dass ich von jedem Schüler sehe, wie oft
+  // er bereits gefehlt hat.“ – gezählt werden nur die eigenen Stunden; „Wir listen dann die Zeiten, wo er die ganze Stunde gefehlt hat, in einer Zeile auf und die
+  // Zeiten, die er nur minutenweise gefehlt hat, durch zu spät kommen oder früher gehen, auf einer separaten Linie.“). Quelle: eigene Tageseinträge der App und aus
+  // WebUntis übernommene (quelle 'webuntis', ganz = Zahl der ganz verpassten Stunden, teil = [{ art: 'spaet' | 'frueh' | 'zwischen', von, bis, min }]).
+  const tagText = (tk) => { const [j, m, t] = tk.split('-').map(Number); return new Date(j, m - 1, t).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }); };
+  const minuteVon = (x) => { if (!x) return null; const [h, m] = String(x).split(':').map(Number); return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : null; };
+  const minuten = (von, bis) => { const a = minuteVon(von), b = minuteVon(bis); return a !== null && b !== null && b > a ? b - a : null; };
+  // Gehaltene Stunden je Klasse und Tag: d.unterricht = { 'JJJJ-MM-TT': [{ von, bis }] } aus dem WebUntis-Stundenplan des Lehrers. Für Tage, die nur in der App
+  // erfasst sind, gelten die Stunden vom gleichen Wochentag der letzten bekannten Woche, sonst eine Stunde zu 45 Minuten. Ein Block zählt nach Länge (90 Min. = 2 Std.).
+  const dauer = (l) => minuten(l.von, l.bis) || 45;
+  const einheiten = (l) => Math.max(1, Math.round(dauer(l) / 45));
+  function stundenAm(d, tk) {
+    const u = d.unterricht || {};
+    if (u[tk] && u[tk].length) return u[tk];
+    const wt = new Date(tk + 'T12:00').getDay(), gleich = Object.keys(u).filter((t) => u[t].length && new Date(t + 'T12:00').getDay() === wt).sort();
+    return gleich.length ? u[gleich[gleich.length - 1]] : [{ von: null, bis: null }];
+  }
+  // Je Schüler: ganz verpasste Stunden (rot), minutenweise verpasste Zeit in den übrigen Stunden, dazu je Unterrichtsstunde ein Feld für den Balken.
+  function fehlzeiten(id, d = kd()) {
+    const ganz = [], teil = [], felder = []; let besuchtMin = 0, verpasstMin = 0;
+    if (!d) return { ganz, teil, felder, tage: 0, besuchtMin, verpasstMin };
+    const heute = tagKey(), anw = d.anwesenheit || {};
+    const tage = new Set([...Object.keys(d.unterricht || {}), ...Object.keys(anw).filter((t) => Object.keys(anw[t]).length)]);
+    for (const tk of [...tage].filter((t) => t <= heute).sort()) {
+      const ls = stundenAm(d, tk), n = ls.reduce((a, l) => a + einheiten(l), 0), gesamt = ls.reduce((a, l) => a + dauer(l), 0);
+      const e = (anw[tk] || {})[id], untis = !!(e && e.quelle === 'webuntis');
+      let rot = 0, weg = 0;
+      if (e && e.s === 'weg') rot = untis ? Math.min(n, e.ganz || n) : n;
+      else if (e && e.s === 'spaet') {
+        rot = untis ? Math.min(n, e.ganz || 0) : 0;
+        if (untis) for (const t of e.teil || []) { teil.push({ tk, text: (t.min ? t.min + ' Min. ' : '') + (t.art === 'spaet' ? 'zu spät' : t.art === 'frueh' ? 'früher gegangen' : 'zwischendurch weg'), min: t.min || 0, untis }); weg += t.min || 0; }
+        else for (const z of anwZeiten(e)) { // leeres „von“ = ab Beginn der ersten Stunde, leeres „bis“ = bis Ende der letzten
+          const m = minuten(z.von || ls[0].von, z.bis || ls[ls.length - 1].bis); teil.push({ tk, text: (m ? m + ' Min. ' : '') + zeitraumText(z), min: m || 0 }); weg += m || 0;
+        }
+      }
+      if (rot) ganz.push({ tk, std: rot, untis });
+      for (let i = 0; i < n; i++) felder.push({ tk, rot: i < rot });
+      const besucht = gesamt * (n - rot) / n; besuchtMin += besucht; verpasstMin += Math.min(weg, besucht);
+    }
+    return { ganz, teil, felder, tage: new Set([...ganz, ...teil].map((x) => x.tk)).size, besuchtMin, verpasstMin };
+  }
+  // Details in der Seitenspalte „Anwesenheit“: Balken 1 = alle gehaltenen Stunden als Kästchen, ganz verpasste rot (Wunsch 27.11.2026 abends: „… die Gesamtstundenanzahl,
+  // die ich gehalten habe, als Einbahnbalken, aus lauter kleinen Vierecken sozusagen, und dann die gesamten Stunden, die er gefehlt hat, die sind dann einfach dann rot
+  // dargestellt.“); Balken 2 = die übrige Zeit, Anteil minutenweise verpasst („… ein weiterer Balken nimmt dann die verbleibenden Stunden, die er anwesend war und zeigt
+  // dann prozentual, wie viel Prozent er davon teilweise gefehlt hat.“). Darunter je eine Zeile mit den Tagen.
+  const prozent = (x) => (x > 0 && x < 0.01 ? '< 1' : String(Math.round(x * 100))) + ' %';
+  function fehlBox(id) {
+    const f = fehlzeiten(id), box = document.createElement('div'); box.className = 'fehl-box';
+    const h = document.createElement('b'); h.textContent = 'Fehlzeiten bisher (deine Stunden)'; box.append(h);
+    const zeile = (titel, eintraege, leer) => {
+      const z = document.createElement('div'); z.className = 'fehl-zeile';
+      const t = document.createElement('span'); t.className = 'fehl-titel'; t.textContent = titel; z.append(t, ' ');
+      z.append(eintraege.length ? eintraege.join(' · ') : leer); box.append(z);
+    };
+    const n = f.felder.length, rot = f.felder.filter((x) => x.rot).length, min = f.teil.reduce((a, x) => a + x.min, 0);
+    if (!n) { const l = document.createElement('div'); l.className = 'leise'; l.textContent = 'Noch keine Stunden erfasst.'; box.append(l); return box; }
+    const kopf1 = document.createElement('div'); kopf1.className = 'fehl-zahl';
+    kopf1.textContent = 'Ganz gefehlt: ' + rot + ' von ' + n + ' Std. (' + prozent(rot / n) + ')';
+    const b1 = document.createElement('div'); b1.className = 'fehl-felder';
+    for (const x of f.felder) { const q = document.createElement('i'); if (x.rot) q.className = 'rot'; q.title = tagText(x.tk) + (x.rot ? ' – gefehlt' : ''); b1.append(q); }
+    box.append(kopf1, b1);
+    zeile('Tage:', f.ganz.map((x) => tagText(x.tk) + ' (' + x.std + ' Std.)'), 'keine');
+    const anteil = f.besuchtMin ? f.verpasstMin / f.besuchtMin : 0;
+    const kopf2 = document.createElement('div'); kopf2.className = 'fehl-zahl';
+    kopf2.textContent = 'Von der übrigen Zeit minutenweise gefehlt: ' + prozent(anteil) + (min ? ' (' + min + ' Min.)' : '');
+    const b2 = document.createElement('div'); b2.className = 'fehl-anteil'; const fl = document.createElement('span'); fl.style.width = Math.min(100, anteil * 100) + '%'; b2.append(fl);
+    box.append(kopf2, b2);
+    zeile('Zu spät / früher gegangen:', f.teil.map((x) => tagText(x.tk) + ' ' + x.text), 'keine');
+    if ([...f.ganz, ...f.teil].some((x) => x.untis) || Object.keys(kd().unterricht || {}).length) { const q = document.createElement('div'); q.className = 'leise'; q.style.fontSize = '12px'; q.textContent = 'Stunden und ältere Fehlzeiten aus WebUntis übernommen (nur deine Stunden mit dieser Klasse).'; box.append(q); }
+    return box;
+  }
+  // Übernahme aus WebUntis (window.__klassenApp.fehlzeitenUebernehmen): liste = [{ klasse, id, tag: 'JJJJ-MM-TT', s: 'weg' | 'spaet', ab, ganz, teil }],
+  // bereich = { von, bis } (Tage): frühere WebUntis-Einträge in diesem Zeitraum werden zuerst entfernt (wiederholbar, auch wenn WebUntis inzwischen anders ist).
+  // Eigene Einträge des Lehrers bleiben immer stehen (dann zählt der eigene Eintrag).
+  function fehlzeitenUebernehmen(liste, bereich) {
+    const z = { neu: 0, entfernt: 0, eigeneBehalten: 0, unbekannt: 0 };
+    const klassen = new Set((liste || []).map((f) => f.klasse).concat((bereich && bereich.klassen) || [], Object.keys((bereich && bereich.unterricht) || {})));
+    if (bereich && bereich.von && bereich.bis) for (const k of klassen) {
+      const d = st.klassen[k]; if (!d || !d.anwesenheit) continue;
+      for (const [tk, tg] of Object.entries(d.anwesenheit)) {
+        if (tk < bereich.von || tk > bereich.bis) continue;
+        for (const [sid, e] of Object.entries(tg)) if (e && e.quelle === 'webuntis') { delete tg[sid]; z.entfernt++; }
+        if (!Object.keys(tg).length) delete d.anwesenheit[tk];
+      }
+    }
+    // gehaltene Stunden (bereich.unterricht = { klasse: { tag: [{ von, bis }] } }) – im Zeitraum ersetzen
+    if (bereich && bereich.unterricht) for (const [k, tage] of Object.entries(bereich.unterricht)) {
+      const d = st.klassen[k]; if (!d) continue; d.unterricht = d.unterricht || {};
+      if (bereich.von && bereich.bis) for (const tk of Object.keys(d.unterricht)) if (tk >= bereich.von && tk <= bereich.bis) delete d.unterricht[tk];
+      for (const [tk, ls] of Object.entries(tage || {})) if (/^\d{4}-\d\d-\d\d$/.test(tk) && Array.isArray(ls) && ls.length) {
+        d.unterricht[tk] = ls.map((l) => ({ von: l.von || null, bis: l.bis || null })).sort((a, b) => String(a.von).localeCompare(String(b.von)));
+        z.tageMitUnterricht = (z.tageMitUnterricht || 0) + 1;
+      }
+    }
+    for (const f of liste || []) {
+      const d = st.klassen[f.klasse]; if (!d || !d.schueler.some((s) => s.id === f.id) || !/^\d{4}-\d\d-\d\d$/.test(f.tag || '')) { z.unbekannt++; continue; }
+      d.anwesenheit = d.anwesenheit || {}; const tg = (d.anwesenheit[f.tag] = d.anwesenheit[f.tag] || {});
+      if (tg[f.id] && tg[f.id].quelle !== 'webuntis') { z.eigeneBehalten++; continue; }
+      const teil = (f.teil || []).map((t) => ({ art: t.art, von: t.von || null, bis: t.bis || null, min: t.min || null }));
+      if (f.s === 'weg') tg[f.id] = { s: 'weg', t: null, um: Date.now(), quelle: 'webuntis', ganz: f.ganz || 1, teil: [] };
+      else {
+        const ab = (f.ab && f.ab.length ? f.ab : [{ von: null, bis: null }]).map((x) => ({ von: x.von || null, bis: x.bis || null }));
+        tg[f.id] = { s: 'spaet', ab, t: ab[0].bis || ab[0].von || null, um: Date.now(), quelle: 'webuntis', ganz: f.ganz || 0, teil };
+      }
+      z.neu++;
+    }
+    zeichne(); if (IN_MOODLE) moodleMerken(true);
+    return z;
+  }
   // Anwesenheit heute bearbeiten – Seitenspalte in „Bewerten“ und Fenster in „Anwesenheit“ (Tipp auf das Zeichen oben rechts an der Kachel). Aktiven Knopf
   // erneut tippen = zurück auf „offen“. Bei „zeitweise abwesend“ je Zeitraum „weg von … bis … Uhr“ (leer = Beginn/Ende), dazu „+ ging (jetzt)“ und „kam zurück (jetzt)“.
   function anwEditor(s, nachher) {
@@ -289,7 +398,14 @@
     else sz.textContent = s.mid && !standDaten ? '…' : '–';
     const hs = sd && heatSpanne(); // Heatmap am Foto (nur im Reiter „Bearbeitungsstand“ sichtbar, siehe heatSpanne)
     if (hs) { k.classList.add('heat'); k.style.setProperty('--heat', heatFarbe(sd.erledigt, hs)); }
-    k.append(bildEl(s), n, p, no, an, sz); return k;
+    k.append(bildEl(s), n, p, no, an, sz);
+    // Zahl der Tage mit Fehlzeit oben links (nur in „Anwesenheit“, seit Stand .29); rot = ganze Stunden dabei, orange = nur minutenweise
+    if (modus === 'anwesenheit') {
+      const f = fehlzeiten(s.id);
+      if (f.tage) { const fz = document.createElement('div'); fz.className = 'fz' + (f.ganz.length ? '' : ' nur-minuten'); fz.textContent = f.tage + '×';
+        fz.title = 'An ' + f.tage + (f.tage === 1 ? ' Tag' : ' Tagen') + ' gefehlt (ganze Stunden: ' + f.ganz.length + '×, minutenweise: ' + f.teil.length + '×) – tippen: Details'; k.append(fz); }
+    }
+    return k;
   }
 
   function zeichneKlassenwahl() {
@@ -453,12 +569,26 @@
 
   const notenZeigen = () => document.body.classList.contains('noten-zeigen');
   const offeneKriterien = new Set(); // aufgeklappte Eintragslisten „<Schüler>:<Kriterium>“ (nur in dieser Sitzung)
+  // Seitenspalte in „Anwesenheit“ (seit Stand .29, Wunsch 27.11.2026 abends: „Im Prinzip sieht man bei der Anzeige Bewerten und Stand die Gesichter besser wie bei
+  // Anwesenheit. Das liegt daran, dass natürlich ein Gesicht ein Hochkantformat hat … Ich glaube, wir können bei Anwesenheit eben auch die Details lassen und bei
+  // Anwesenheit sieht man dann einfach jeweils die Fehlzeiten der Vergangenheit.“ – hebt „Seitenspalte nur in Bewerten“ von Stand .22 für „Anwesenheit“ auf).
+  // Inhalt: Foto und Name, Anwesenheit heute mit Uhrzeiten, Fehlzeiten bisher in zwei Zeilen (ganze Stunden / minutenweise).
+  function zeichneAnwSeite(s) {
+    if (!s) { seite.insertAdjacentHTML('afterbegin', '<div class="leer">' + (kd() ? 'Ein Gesicht antippen: Anwesenheit wechseln<br>und rechts die Fehlzeiten sehen.<br><br>Zeichen oben rechts antippen:<br>nur ansehen, nichts ändern.' : '') + '</div>'); return; }
+    const kopf = document.createElement('div'); kopf.className = 'kopf';
+    const b = bildEl(s); b.title = 'Foto aufnehmen oder ändern'; b.addEventListener('click', () => fotoOeffnen(s));
+    const h = document.createElement('h2'); h.textContent = s.name;
+    const zu = document.createElement('button'); zu.className = 'zu'; zu.textContent = '✕'; zu.title = 'Schließen';
+    zu.addEventListener('click', () => { gewaehlt = null; zeichne(); });
+    kopf.append(b, h, zu); seite.append(kopf, anwEditor(s, zeichne), fehlBox(s.id));
+  }
   function zeichneSeite() {
     for (const c of [...seite.children]) if (c !== standBox) c.remove(); // die eingebettete Perlenkette bleibt stehen (sonst lädt sie jedes Mal neu)
     if (standBox.parentNode !== seite) seite.append(standBox);
     standBox.hidden = modus !== 'stand' || !kd();
     const s = gewaehlt && finde(gewaehlt);
     if (modus === 'stand') { zeichneStandSeite(s); return; }
+    if (modus === 'anwesenheit') { zeichneAnwSeite(s); return; }
     if (!s) { seite.insertAdjacentHTML('afterbegin', '<div class="leer">' + (kd() ? 'Ein Gesicht antippen,<br>um schnell zu bewerten.' : '') + '</div>'); return; }
     const nv = noteVon(s.id, 'alle');
     const kopf = document.createElement('div'); kopf.className = 'kopf';
@@ -672,7 +802,7 @@
   const markiere = (z) => { if (markiert) markiert.classList.remove('ziel'); markiert = z; if (z) z.classList.add('ziel'); };
   document.addEventListener('pointerdown', (e) => {
     const k = e.target.closest('.karte'); if (!k || e.button > 0 || k.closest('.seite')) return;
-    zug = { k, id: k.dataset.id, x0: e.clientX, y0: e.clientY, bewegt: false, zeichen: !!e.target.closest('.anw') };
+    zug = { k, id: k.dataset.id, x0: e.clientX, y0: e.clientY, bewegt: false, zeichen: !!e.target.closest('.anw, .fz') };
   });
   document.addEventListener('pointermove', (e) => {
     if (!zug) return; // Ziehen geht in beiden Betriebsarten (Wunsch 27.11.): Bild auf Bild = Plätze tauschen
@@ -686,8 +816,9 @@
       if (e.type !== 'pointerup') return;
       if (modus === 'bewerten' || modus === 'stand') { gewaehlt = z.id; zeichne(); }
       else if (modus === 'anwesenheit') {
-        if (z.zeichen) { const s = finde(z.id); if (s) anwDlgOeffnen(s); return; } // Zeichen oben rechts: Uhrzeiten einstellen (Wunsch 27.11.2026)
-        const a = anwHeute(z.id); anwSetzen(z.id, ANW_FOLGE[a ? a.s : 'offen']); zeichne();
+        // Zeichen oben rechts / Fehlzahl oben links: nur auswählen – Uhrzeiten und Fehlzeiten stehen seit Stand .29 in der Seitenspalte (vorher Fenster)
+        if (z.zeichen) { gewaehlt = z.id; zeichne(); return; }
+        const a = anwHeute(z.id); anwSetzen(z.id, ANW_FOLGE[a ? a.s : 'offen']); gewaehlt = z.id; zeichne();
         const k = document.querySelector('#plaetze .karte[data-id="' + z.id + '"], #ablage .karte[data-id="' + z.id + '"]'); if (k) k.classList.add('blitz');
       }
       return;
@@ -1711,6 +1842,6 @@
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
   }
-  window.__klassenApp = { stand: STAND, zustand: () => st, fotoAnzahl: () => fotos.size, bildVerkleinern, moodle: IN_MOODLE, speichereJetzt: () => moodleSpeichern() };
+  window.__klassenApp = { stand: STAND, zustand: () => st, fotoAnzahl: () => fotos.size, bildVerkleinern, moodle: IN_MOODLE, speichereJetzt: () => moodleSpeichern(), fehlzeitenUebernehmen, fehlzeiten: (klasse, id) => fehlzeiten(id, st.klassen[klasse]) };
   start();
 })();

@@ -275,8 +275,27 @@ body:not(.bearbeiten) .platz { padding: 0; border-width: 0; } /* seit Stand .25 
 .raum-zeile .raum-name.an { border-color: var(--akzent); background: var(--akzent-weich); font-weight: 600; }
 /* Seitenspalte nur in „Bewerten“ (Wunsch 27.11.2026: „bei Anwesenheit gibt es keine Bewertung, das braucht man nur bei Bewerten. Da kann der
    ganz gesamte Platz genutzt werden.“) – in „Anwesenheit“ und „Sitzplan bearbeiten“ bekommt der Sitzplan die volle Breite. */
-body.anwesenheit .haupt-bereich, body.bearbeiten .haupt-bereich { grid-template-columns: minmax(0, 1fr); }
-body.anwesenheit .seite, body.bearbeiten .seite { display: none; }
+/* Seit Stand .29 hat „Anwesenheit“ wieder eine Seitenspalte – mit Anwesenheit heute und den Fehlzeiten statt der Bewertung (Wunsch 27.11.2026 abends: „… wir können
+   bei Anwesenheit eben auch die Details lassen …“); die Tische werden dadurch schmaler, eher hochkant, die Gesichter passen besser. */
+body.bearbeiten .haupt-bereich { grid-template-columns: minmax(0, 1fr); }
+body.bearbeiten .seite { display: none; }
+/* Fehlzahl oben links auf der Kachel (nur „Anwesenheit“): Tage mit Fehlzeit; rot = ganze Stunden dabei, orange = nur minutenweise */
+.fz { display: none; }
+body.anwesenheit .karte .fz { display: grid; place-items: center; position: absolute; top: 2px; left: 2px; z-index: 2; min-width: clamp(18px, 20cqw, 26px);
+  height: clamp(18px, 20cqw, 26px); padding: 0 clamp(3px, 4cqw, 6px); border-radius: 13px; background: var(--w5); color: #fff; font-weight: 700;
+  font-size: clamp(10px, 11cqw, 13px); white-space: nowrap; box-shadow: 0 0 0 2px #fff; cursor: pointer; }
+body.anwesenheit .karte .fz.nur-minuten { background: var(--w4); }
+body.anwesenheit .karte .haken ~ .fz { left: 24px; } /* neben dem blauen Haken „heute bewertet“ */
+.fehl-box { display: grid; gap: 6px; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--linie); border-radius: 10px; font-size: 14px; }
+.fehl-zeile { line-height: 1.45; color: var(--leise); }
+.fehl-titel { font-weight: 600; color: var(--text); }
+.fehl-zahl { font-weight: 600; margin-top: 4px; }
+/* Balken 1: je gehaltene Stunde ein Kästchen, ganz verpasste rot; Balken 2: Anteil der übrigen Zeit, die minutenweise fehlte (orange) */
+.fehl-felder { display: flex; flex-wrap: wrap; gap: 2px; }
+.fehl-felder i { width: 11px; height: 14px; border-radius: 2px; background: color-mix(in srgb, var(--gruen) 45%, #fff); }
+.fehl-felder i.rot { background: var(--w5); }
+.fehl-anteil { height: 14px; border-radius: 3px; background: color-mix(in srgb, var(--gruen) 45%, #fff); overflow: hidden; }
+.fehl-anteil span { display: block; height: 100%; background: var(--w4); min-width: 0; }
 /* Raumwahl hinter der Klassenwahl (Wunsch 27.11.2026), nur bei mindestens zwei Räumen; beide schmaler, damit die Kopfleiste auf dem iPad einzeilig bleibt */
 #raumWahl { max-width: 110px; }
 body.mit-raumwahl #klasse { max-width: 130px; }
