@@ -62,7 +62,7 @@ body.bearbeiten .ablage-box.nur-bearbeiten { display: block !important; }
 .plaetze { display: flex; flex-direction: column; }
 /* Kacheln höchstens 4 : 3 breit (Wunsch 27.11.2026 ~14:46: „bei der Anwesenheit sollen dann die Köpfe oben und unten nicht abgeschnitten sein“ – ohne
    Seitenspalte wurden die Tische 171 × 74 breit) = Format des Zuschnitts; ist mehr Platz da, steht der Sitzplan mittig, die Tische bleiben aneinander. */
-.plaetze { --platz-b: var(--platz-h, 120px); } /* seit Stand .30 quadratisch = Format des Zuschnitts auf iPad und PC (Wunsch 27.11.2026 ~23:57) */
+.plaetze { --platz-b: calc(var(--platz-h, 120px) * 0.8); } /* seit Stand .31 Hochformat 4 : 5 = Format des Zuschnitts auf iPad und PC (Wunsch 27.11.2026 ~23:57; TISCH_FORMAT in app.js) */
 .reihe, .reihen-gang { display: grid; justify-content: center; }
 .platz { min-height: var(--platz-h, 120px); padding: 5px; border: 2px dashed transparent; border-radius: 12px; background: var(--platz); display: flex; align-items: center; justify-content: center; position: relative; }
 /* Die Karte füllt den ganzen Tisch (Wunsch 27.11.2026, Stand .24: „… dass die Bilder den kompletten Tisch, also das Rechteck ausfüllen“) */
@@ -264,7 +264,7 @@ th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--lini
 .foto-zeile.doppelt { outline: 2px solid var(--w5); }
 @media (max-width: 620px) { .foto-zeile { grid-template-columns: 56px minmax(0, 1fr) auto; } .foto-zeile select { grid-column: 2 / 3; } }
 .zuschnitt { display: grid; gap: 10px; justify-items: center; }
-.zuschnitt canvas { width: min(100%, 460px); aspect-ratio: 1; border-radius: 12px; touch-action: none; background: #2b2f36; cursor: grab; }
+.zuschnitt canvas { width: min(100%, 420px, calc(60vh * 780 / 930)); aspect-ratio: 780 / 930; border-radius: 12px; touch-action: none; background: #2b2f36; cursor: grab; }
 .zuschnitt .kopf-zeile { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
 .zuschnitt label { display: flex; gap: 8px; align-items: center; width: min(100%, 440px); }
 .zuschnitt input[type=range] { flex: 1; }

@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-28.30';
+  const STAND = '2026-11-28.31';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -502,7 +502,9 @@
   // lagen unter dem Bildschirmrand. Passt er nicht, rückt alles enger zusammen und die Bilder werden kleiner, bis die Tafel zu sehen ist.
   // Gerechnet wird nur, wenn sich Größe, Klasse, Reihen, Plätze, Durchgänge oder Betriebsart geändert haben.
   let passSchluessel = '';
-  const TISCH_MAX = 140; // größte Tischkante in px (Tische quadratisch seit Stand .30)
+  // Tische im Hochformat 4 : 5 (Breite : Höhe) = Format des Zuschnitts, auf iPad und PC gleich (seit Stand .31; .30 kurz quadratisch). Abgleich 28.11.2026 an den vier
+  // Klassen bei iPad quer: Die Fläche über dem Namensstreifen (dort steht der Kopf) ist so in drei Klassen deutlich höher und nirgends niedriger als quadratisch.
+  const TISCH_FORMAT = 0.8, TISCH_MAX = 160; // Breite/Höhe; größte Tischhöhe in px
   function einpassen() {
     const raum = $('raum'), tafel = raum.querySelector('.tafel'), d = kd(), p = plaetzeEl.style;
     if (!d) { passSchluessel = ''; p.removeProperty('--platz-h'); p.removeProperty('--bild-max'); document.body.classList.remove('eng'); return; }
@@ -510,7 +512,7 @@
     if (schluessel === passSchluessel) return;
     passSchluessel = schluessel;
     p.removeProperty('--platz-h'); p.removeProperty('--bild-max'); document.body.classList.remove('eng');
-    // Tische quadratisch (seit Stand .30, Zuschnitt = Tisch auf iPad und PC): zuerst so groß, dass eine Reihe samt Durchgängen in die Breite passt (höchstens
+    // Tische im festen Format (seit Stand .30/.31, Zuschnitt = Tisch auf iPad und PC): zuerst so groß, dass eine Reihe samt Durchgängen in die Breite passt (höchstens
     // TISCH_MAX), dann – wenn der Sitzplan nicht in die Höhe passt – enger und kleiner. Vorher höchstens 120 px hoch und bis 4 : 3 breit, je nach Bildschirm.
     const wurzel = getComputedStyle(document.documentElement), px = (n) => parseFloat(wurzel.getPropertyValue(n)) || 0, ga = gaengeVon(d);
     let gangMax = 0;
@@ -518,7 +520,7 @@
       let g = 0; for (let c = 1; c < d.spalten; c++) g += ga['s' + c + ':' + r] ? px('--gang-breit') : modus === 'bearbeiten' ? px('--gang-tippen') : px('--gang-schmal');
       gangMax = Math.max(gangMax, g);
     }
-    let h = Math.max(56, Math.min(TISCH_MAX, Math.floor((plaetzeEl.clientWidth - gangMax) / Math.max(1, d.spalten))));
+    let h = Math.max(56, Math.min(TISCH_MAX, Math.floor((plaetzeEl.clientWidth - gangMax) / Math.max(1, d.spalten) / TISCH_FORMAT)));
     p.setProperty('--platz-h', h + 'px');
     const imRaum = (y) => y - raum.getBoundingClientRect().top + raum.scrollTop;
     const nutzbar = () => raum.clientHeight - parseFloat(getComputedStyle(raum).paddingBottom);
@@ -1326,16 +1328,16 @@
     img.onerror = () => alert('Dieses Bild lässt sich nicht öffnen.');
     img.src = foto.url;
   }
-  // Zuschnitt = genau der Tisch: seit Stand .30 quadratisch, auf dem iPad wie am PC (Wunsch 27.11.2026 ~23:57: „… Aber dass der Rahmen auch der ist, der dann
+  // Zuschnitt = genau der Tisch: seit Stand .31 Hochformat 4 : 5 (wie TISCH_FORMAT), auf dem iPad wie am PC (Wunsch 27.11.2026 ~23:57: „… Aber dass der Rahmen auch der ist, der dann
   // später auch angezeigt wird auf dem Tablet oder auf dem PC.“); gespeichert wird 400 × 400. Ältere Fotos (320 × 320, 400 × 300) werden mit „cover“ eingepasst.
-  const CH = C;
+  const CH = C * 5 / 4;
   const zuschnittMass = (img, zoom) => { const sc = Math.max(C / img.naturalWidth, CH / img.naturalHeight) * zoom; return { w: img.naturalWidth * sc, h: img.naturalHeight * sc }; };
   const fotoMass = () => zuschnittMass(foto.img, foto.zoom);
   // Verschieben auch über den Rahmen hinaus (Wunsch 27.11.2026 ~14:32: „… soll man es auch über den Rahmen hinaus verschieben können, so falls das
   // Bild groß ist, dass man es eben auch entsprechend positionieren kann.“): Das Bild darf bis auf einen Rest von 20 % des Feldes hinausgeschoben
   // werden. Größe 0,3- bis 8-fach. Frei gewordene Fläche: seit Stand .30 das Foto stark unscharf und aufgehellt statt Weiß (Wunsch 27.11.2026 ~23:58:
   // „… dass einfach immer der ganze Kopf zu sehen ist, aber dass der das Feld entsprechend ausfüllt.“ – bei engen Hochformat-Fotos passt der ganze Kopf nur,
-  // wenn das Foto schmaler ist als der quadratische Tisch).
+  // wenn das Foto schmaler ist als der Tisch).
   const fotoBegrenzen = () => { foto.zoom = Math.max(0.3, Math.min(8, foto.zoom)); const m = fotoMass(), mx = (m.w + C) / 2 - C * 0.2, my = (m.h + CH) / 2 - CH * 0.2; foto.ox = Math.max(-mx, Math.min(mx, foto.ox)); foto.oy = Math.max(-my, Math.min(my, foto.oy)); };
   const unscharfe = new WeakMap(); // je Bild ein winziges Abbild (wird groß gezogen = unscharf; ctx.filter kennt Safari nicht)
   function unscharfMalen(ctx, g, gh, img, x, y, w, h) {
@@ -1475,7 +1477,7 @@
       let img = null; try { img = await bildLaden(orig || fotos.get(s.id)); } catch (e) { ohne++; continue; }
       let k = null; try { k = await kopfFinden(img); } catch (e) { /* ohne Erkennung */ }
       if (!k) { ohne++; continue; }
-      const z = kopfZuschnitt(img, k, streifen), out = document.createElement('canvas'); out.width = out.height = 400; zuschnittMalen(out.getContext('2d'), 400, img, z);
+      const z = kopfZuschnitt(img, k, streifen), out = document.createElement('canvas'); out.width = 400; out.height = 500; zuschnittMalen(out.getContext('2d'), 400, img, z);
       const daten = out.toDataURL('image/jpeg', 0.85);
       try { await DB.schreib('fotos', s.id, daten); } catch (e) { ohne++; continue; }
       if (!orig) originalMerken(s.id, originalVon(img));
@@ -1486,7 +1488,7 @@
   }
   $('fotoSpeichern').addEventListener('click', async () => {
     if (!foto.img || !foto.s) return;
-    const out = document.createElement('canvas'); out.width = 400; out.height = 400; fotoMalen(out.getContext('2d'), 400); // quadratisch wie der Tisch (seit Stand .30)
+    const out = document.createElement('canvas'); out.width = 400; out.height = 500; fotoMalen(out.getContext('2d'), 400); // 4 : 5 wie der Tisch (seit Stand .31)
     const daten = out.toDataURL('image/jpeg', 0.85);
     try { await DB.schreib('fotos', foto.s.id, daten); } catch (e) { alert('Das Foto ließ sich nicht speichern: ' + (e && e.message || e)); return; }
     if (foto.origNeu) originalMerken(foto.s.id, originalVon(foto.img));
@@ -1593,11 +1595,11 @@
     const d = kd();
     const streifen = streifenAnteil();
     for (const f of bereit) {
-      // Kopf automatisch einpassen (seit Stand .30); ohne gefundenes Gesicht wie bisher: quadratisch, mittig, bei Hochformat 30 % von oben
-      const w = f.img.naturalWidth, h = f.img.naturalHeight, sk = Math.min(w, h), s = d && d.schueler.find((x) => x.id === f.sid);
+      // Kopf automatisch einpassen (seit Stand .30); ohne gefundenes Gesicht: mittig, bei überstehendem Hochformat eher den oberen Teil
+      const s = d && d.schueler.find((x) => x.id === f.sid);
       let z = null; try { const k = await kopfFinden(f.img); if (k) z = kopfZuschnitt(f.img, k, streifen); } catch (e) { /* ohne Erkennung */ }
-      if (!z) z = { zoom: 1, ox: 0, oy: h > w ? Math.round((h - sk) * 0.2 * (C / sk) * 10) / 10 : 0 };
-      const out = document.createElement('canvas'); out.width = out.height = 400; zuschnittMalen(out.getContext('2d'), 400, f.img, z);
+      if (!z) z = { zoom: 1, ox: 0, oy: Math.round(Math.max(0, (zuschnittMass(f.img, 1).h - CH) / 2) * 0.6 * 10) / 10 };
+      const out = document.createElement('canvas'); out.width = 400; out.height = 500; zuschnittMalen(out.getContext('2d'), 400, f.img, z);
       const daten = out.toDataURL('image/jpeg', 0.85);
       try { await DB.schreib('fotos', f.sid, daten); } catch (e) { alert('Ein Foto ließ sich nicht speichern: ' + (e && e.message || e)); break; }
       fotos.set(f.sid, daten); moodleFoto(f.sid, daten); n++;
