@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.16';
+  const STAND = '2026-11-27.17';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -204,7 +204,9 @@
       if (r === 1) break;
       // Abstand zur Reihe davor (r-1, näher an der Tafel); breit, sobald dort irgendwo ein Gangstück liegt
       const v = r - 1, zg = document.createElement('div'); zg.className = 'reihen-gang'; zg.style.gridTemplateColumns = vorlage(v);
-      zg.style.height = spur(Object.keys(ga).some((k) => k.startsWith('r' + v + ':')));
+      // Reihenabstand: breit bei Durchgang, sonst kleiner fester Abstand (nebeneinander stehen die Tische dagegen ohne Abstand)
+      const rg = Object.keys(ga).some((k) => k.startsWith('r' + v + ':'));
+      zg.style.height = rg ? 'var(--gang-breit)' : modus === 'bearbeiten' ? 'var(--gang-tippen)' : 'var(--reihe-abstand)';
       for (let c = 1; c <= d.spalten; c++) {
         const k = 'r' + v + ':' + c; zg.append(gangEl(k, !!ga[k], String(2 * c - 1), 'zwischen Platz ' + v + '.' + c + ' und ' + r + '.' + c));
         if (c < d.spalten) {

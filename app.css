@@ -55,7 +55,7 @@ body.bearbeiten .ablage-box.nur-bearbeiten { display: block !important; }
 .haupt-bereich { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: 0; }
 .raum { padding: 14px; overflow: auto; }
 .tafel { background: var(--tafel); color: #e8f1ea; text-align: center; border-radius: 8px; padding: 6px; font-size: 12px; letter-spacing: .05em; margin: 14px auto 0; max-width: 420px; }
-:root { --gang-schmal: 10px; --gang-tippen: 22px; --gang-breit: 26px; } /* Durchgang nur angedeutet (Wunsch 27.11.2026) */
+:root { --gang-schmal: 0px; --reihe-abstand: 8px; --gang-tippen: 22px; --gang-breit: 26px; } /* Durchgang nur angedeutet; ohne Durchgang stehen die Tische aneinander (Wünsche 27.11.2026) */
 .plaetze { display: flex; flex-direction: column; }
 .reihe, .reihen-gang { display: grid; }
 .platz { min-height: var(--platz-h, 120px); padding: 5px; border: 2px dashed transparent; border-radius: 12px; background: var(--platz); display: flex; align-items: center; justify-content: center; position: relative; }
@@ -225,3 +225,6 @@ th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--lini
 .zuschnitt label { display: flex; gap: 8px; align-items: center; width: min(100%, 380px); }
 .zuschnitt input[type=range] { flex: 1; }
 .schuelerliste td button { min-height: 34px; padding: 4px 10px; }
+/* Ohne eingetragenen Durchgang stehen die Tische nebeneinander ohne Abstand (Wunsch 27.11.2026). In „Sitzplan bearbeiten“ bleiben
+   Innenrand und Rahmen der Plätze, damit Ablageziele und Tipp-Streifen für Durchgänge sichtbar sind. */
+body:not(.bearbeiten) .platz { padding-left: 0; padding-right: 0; border-left-width: 0; border-right-width: 0; }
