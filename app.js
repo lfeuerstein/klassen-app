@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.26';
+  const STAND = '2026-11-27.27';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -287,6 +287,8 @@
     const sd = standDaten && s.mid ? standDaten.get(Number(s.mid)) : null;
     if (sd) { sz.textContent = sd.erledigt + '/' + standDaten.perlen; sz.classList.add('z-' + sd.zustand); sz.title = sd.erledigt + ' von ' + standDaten.perlen + ' Perlen erledigt'; }
     else sz.textContent = s.mid && !standDaten ? '…' : '–';
+    const hs = sd && heatSpanne(); // Heatmap am Foto (nur im Reiter „Bearbeitungsstand“ sichtbar, siehe heatSpanne)
+    if (hs) { k.classList.add('heat'); k.style.setProperty('--heat', heatFarbe(sd.erledigt, hs)); }
     k.append(bildEl(s), n, p, no, an, sz); return k;
   }
 
@@ -589,6 +591,19 @@
       }, 500);
     }).catch((e) => { standBox.innerHTML = '<p class="leise">Der Stadtplan ist gerade nicht erreichbar (' + ((e && e.message) || e) + ').</p>'; });
   }
+  // Heatmap am Foto (Wunsch 27.11.2026 ~14:40, im Hauptchat als N108: „… zeige die Bearbeitungsstände dann beim Bild im Sitzplan wie eine Heatmap an. … am weitesten
+  // … grün, … am weitesten zurück … rot. … zwischendrin … Gelb.“; Aufteilung 19:48 „Aufteilen“ = die Heatmap baut die Klassen-App): im Reiter „Bearbeitungsstand“
+  // färbt sich jedes Foto nach den erledigten Perlen IM VERGLEICH ZUR KLASSE (wer am weitesten ist grün, wer am weitesten zurück ist rot, dazwischen über Gelb).
+  // Sind alle gleich weit: grün, wenn alle fertig sind, sonst gelb. Schüler ohne Moodle-Konto oder ohne Daten bleiben ungefärbt.
+  function heatSpanne() {
+    if (!standDaten) return null;
+    const w = schueler().map((s) => s.mid && standDaten.get(Number(s.mid))).filter(Boolean).map((x) => Number(x.erledigt) || 0);
+    return w.length ? { min: Math.min(...w), max: Math.max(...w) } : null;
+  }
+  function heatFarbe(erledigt, sp) {
+    const t = sp.max > sp.min ? ((Number(erledigt) || 0) - sp.min) / (sp.max - sp.min) : (sp.max >= standDaten.perlen ? 1 : 0.5);
+    return 'hsl(' + Math.round(t * 120) + ', 80%, 45%)';
+  }
   function zeichneStandSeite(s) {
     const d = kd(); if (!d) return;
     if (s) {
@@ -600,6 +615,9 @@
       const az = ansichtKnoepfe(s); if (az) seite.insertBefore(az, standBox);
       if (!s.mid) { const p = document.createElement('p'); p.className = 'leise'; p.textContent = 'Ohne Moodle-Konto gibt es keinen Bearbeitungsstand (von Hand angelegt).'; seite.insertBefore(p, standBox); }
     }
+    const lg = document.createElement('div'); lg.className = 'heat-legende';
+    lg.innerHTML = '<span>Farbe am Foto im Vergleich zur Klasse:</span><span>zurück</span><i></i><span>vorn</span>';
+    seite.insertBefore(lg, standBox);
     standRahmenFuer(d); standJetzt();
   }
 
