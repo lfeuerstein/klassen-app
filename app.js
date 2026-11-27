@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.21';
+  const STAND = '2026-11-27.22';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -232,6 +232,18 @@
     sel.disabled = false;
     for (const id of ids) { const o = document.createElement('option'); o.value = id; o.textContent = st.klassen[id].name; sel.append(o); }
     sel.value = st.klasse;
+    zeichneRaumwahl();
+  }
+  // Raumwahl hinter der Klassenwahl, sobald die Klasse mindestens zwei Räume hat (Wunsch 27.11.2026: „Wenn für eine Klasse mehrere Räume
+  // bestehen, dann sollte hinter der Klasse, nach der Klassenwahl auch dann die Raumwahl möglich sein.“). Letzter Eintrag öffnet den Raum-Dialog.
+  function zeichneRaumwahl() {
+    const d = kd(), lab = $('raumWahlLabel'), sel = $('raumWahl'), ids = raumListe(d);
+    lab.hidden = !d || ids.length < 2; document.body.classList.toggle('mit-raumwahl', !lab.hidden);
+    if (lab.hidden) return;
+    sel.innerHTML = '';
+    for (const rid of ids) { const o = document.createElement('option'); o.value = rid; o.textContent = d.raeume[rid].name; sel.append(o); }
+    const v = document.createElement('option'); v.value = '__raeume'; v.textContent = 'Räume …'; sel.append(v);
+    sel.value = d.raum;
   }
 
   function zeichne() {
@@ -241,6 +253,7 @@
     $('start').hidden = !!d; $('sitzplan').hidden = !d;
     if (!d) { gewaehlt = null; document.body.classList.remove('seite-offen'); zeichneSeite(); zeichneFuss(); einpassen(); return; }
     $('reihen').value = d.reihen; $('spalten').value = d.spalten;
+    for (const b of document.querySelectorAll('.stufe button[data-feld]')) { const f = $(b.dataset.feld), v = Number(f.value); b.disabled = Number(b.dataset.schritt) < 0 ? v <= Number(f.min) : v >= Number(f.max); }
     const rk = $('raumKnopf'), rn = raumName(d); // Raumknopf an der Tafel: „+ Raum“ oder der Name des Raums
     rk.textContent = rn ? rn + ' ▾' : '+ Raum'; rk.title = rn ? 'Raum „' + rn + '“ – tippen: Raum wechseln, hinzufügen, umbenennen' : 'Einen eigenen Sitzplan für einen weiteren Raum anlegen';
     // Jede Tischreihe hat ihre eigene Aufteilung: Zwischen zwei Tischen liegt ein breiter Durchgang nur dort, wo in DIESER Reihe ein
@@ -593,10 +606,19 @@
   $('untisZurueck').addEventListener('click', () => { const d = kd(); d.untisReihenfolge = []; zeichne(); zeichneUntis(); $('untisInfo').textContent = 'Sortiert nach Nachnamen.'; });
   const groesse = () => {
     const d = kd(); if (!d) return;
-    d.reihen = Math.min(8, Math.max(1, Number($('reihen').value) || 5));
-    d.spalten = Math.min(10, Math.max(2, Number($('spalten').value) || 6)); zeichne();
+    const r = Math.min(8, Math.max(1, Number($('reihen').value) || 5)), c = Math.min(10, Math.max(2, Number($('spalten').value) || 6));
+    // Wer auf einem wegfallenden Tisch sitzt, käme in „Noch ohne Platz“ – vorher fragen (mit − ist man schnell einen Tipp zu weit)
+    const weg = Object.keys(d.plaetze).filter((p) => { const m = /^r(\d+)p(\d+)$/.exec(p); return m && (Number(m[1]) > r || Number(m[2]) > c) && finde(d.plaetze[p]); }).length;
+    if (weg && !confirm(weg + (weg === 1 ? ' Schüler sitzt' : ' Schüler sitzen') + ' auf Tischen, die dann wegfallen, und ' + (weg === 1 ? 'kommt' : 'kommen') + ' in „Noch ohne Platz“. Trotzdem ändern?')) {
+      $('reihen').value = d.reihen; $('spalten').value = d.spalten; return;
+    }
+    d.reihen = r; d.spalten = c; zeichne();
   };
   $('reihen').addEventListener('change', groesse); $('spalten').addEventListener('change', groesse);
+  document.querySelectorAll('.stufe button[data-feld]').forEach((b) => b.addEventListener('click', () => {
+    const f = $(b.dataset.feld), n = Math.min(Number(f.max), Math.max(Number(f.min), (Number(f.value) || 0) + Number(b.dataset.schritt)));
+    if (String(n) !== f.value) { f.value = n; groesse(); }
+  }));
   $('notenZeigen').addEventListener('change', (e) => { document.body.classList.toggle('noten-zeigen', e.target.checked); zeichneSeite(); });
 
   // Dialoge: Schließen-Knöpfe und Aktionen
@@ -727,6 +749,11 @@
     zeigeMeldung('Raum „' + name + '“ angelegt mit dem Sitzplan von „' + vorher + '“. Jetzt umstellen – das bleibt nur in „' + name + '“.');
   };
   $('raumKnopf').addEventListener('click', () => raumOeffnen(false));
+  $('raumWahl').addEventListener('change', (e) => {
+    const d = kd(); if (!d) return;
+    if (e.target.value === '__raeume') { e.target.value = d.raum; raumOeffnen(false); return; }
+    raumWechseln(d, e.target.value); gewaehlt = null; zeichne();
+  });
   $('raumPlus').addEventListener('click', () => raumOeffnen(true));
   $('rdHinzu').addEventListener('click', rdHinzu);
   $('rdNeu').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); rdHinzu(); } });

@@ -246,3 +246,17 @@ body:not(.bearbeiten) .platz { padding-left: 0; padding-right: 0; border-left-wi
 .raum-zeile { align-items: center; }
 .raum-zeile .raum-name { flex: 1; text-align: left; }
 .raum-zeile .raum-name.an { border-color: var(--akzent); background: var(--akzent-weich); font-weight: 600; }
+/* Seitenspalte nur in „Bewerten“ (Wunsch 27.11.2026: „bei Anwesenheit gibt es keine Bewertung, das braucht man nur bei Bewerten. Da kann der
+   ganz gesamte Platz genutzt werden.“) – in „Anwesenheit“ und „Sitzplan bearbeiten“ bekommt der Sitzplan die volle Breite. */
+body.anwesenheit .haupt-bereich, body.bearbeiten .haupt-bereich { grid-template-columns: minmax(0, 1fr); }
+body.anwesenheit .seite, body.bearbeiten .seite { display: none; }
+/* Raumwahl hinter der Klassenwahl (Wunsch 27.11.2026), nur bei mindestens zwei Räumen; beide schmaler, damit die Kopfleiste auf dem iPad einzeilig bleibt */
+#raumWahl { max-width: 110px; }
+body.mit-raumwahl #klasse { max-width: 130px; }
+body.mit-raumwahl .werkzeug { column-gap: 10px; }
+/* Reihen / Plätze je Reihe mit − und + (Wunsch 27.11.2026: auf dem iPad nur Zahlen eintippen) – Pfeile des Zahlenfelds ausgeblendet */
+.stufe { display: inline-flex; align-items: center; gap: 4px; }
+.stufe > .leise { margin-right: 2px; }
+.stufe button { min-height: 36px; width: 36px; padding: 0; font-size: 20px; line-height: 1; }
+.stufe input[type=number] { width: 44px; text-align: center; -moz-appearance: textfield; appearance: textfield; }
+.stufe input[type=number]::-webkit-inner-spin-button, .stufe input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }

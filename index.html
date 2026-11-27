@@ -21,10 +21,12 @@
 <header class="werkzeug">
   <b class="app-name">Klassen-App</b>
   <label><span class="lbl">Klasse</span> <select id="klasse"></select></label>
+  <label id="raumWahlLabel" hidden title="Raum wählen (Sitzplan je Raum)"><span class="lbl">Raum</span> <select id="raumWahl"></select></label>
   <div class="modus"><button data-m="bewerten" class="an">Bewerten</button><button data-m="anwesenheit">Anwesenheit</button><button data-m="bearbeiten">Sitzplan bearbeiten</button></div>
   <span class="nur-bearbeiten">
-    <label class="leise">Reihen <input type="number" id="reihen" min="1" max="8" inputmode="numeric"></label>
-    <label class="leise">Plätze je Reihe <input type="number" id="spalten" min="2" max="10" inputmode="numeric"></label>
+    <!-- − / + zum Antippen (Wunsch 27.11.2026: auf dem iPad gibt es keine Pfeile am Zahlenfeld); Knöpfe außerhalb von <label>, sonst löst ein Tipp auf den Text sie aus -->
+    <span class="stufe"><span class="leise">Reihen</span><button type="button" data-feld="reihen" data-schritt="-1" aria-label="Eine Reihe weniger">−</button><input type="number" id="reihen" min="1" max="8" inputmode="numeric" aria-label="Reihen"><button type="button" data-feld="reihen" data-schritt="1" aria-label="Eine Reihe mehr">+</button></span>
+    <span class="stufe"><span class="leise">Plätze je Reihe</span><button type="button" data-feld="spalten" data-schritt="-1" aria-label="Ein Platz je Reihe weniger">−</button><input type="number" id="spalten" min="2" max="10" inputmode="numeric" aria-label="Plätze je Reihe"><button type="button" data-feld="spalten" data-schritt="1" aria-label="Ein Platz je Reihe mehr">+</button></span>
     <button id="schuelerPlus" title="Einen einzelnen Schüler in diese Klasse aufnehmen">+ Schüler …</button>
     <button id="raumPlus" title="Einen eigenen Sitzplan für einen weiteren Raum anlegen (übernimmt zuerst diesen)">+ Raum …</button>
     <span class="leise">Zwischen zwei Tische tippen: dieses Stück wird Durchgang (ein/aus)</span>
