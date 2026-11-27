@@ -59,23 +59,21 @@ body.bearbeiten .ablage-box.nur-bearbeiten { display: block !important; }
 .plaetze { display: flex; flex-direction: column; }
 .reihe, .reihen-gang { display: grid; }
 .platz { min-height: var(--platz-h, 120px); padding: 5px; border: 2px dashed transparent; border-radius: 12px; background: var(--platz); display: flex; align-items: center; justify-content: center; position: relative; }
-/* Größere Bilder (Wunsch 27.11.2026): die Karte füllt den Platz, Bild und Name wachsen mit */
-.platz .karte { width: 100%; max-width: 210px; container-type: inline-size; }
-.platz .bild { width: min(64cqw, var(--bild-max, 140px)); height: auto; aspect-ratio: 1; max-width: 140px; font-size: min(21cqw, calc(var(--bild-max, 140px) * .33)); }
+/* Die Karte füllt den ganzen Tisch (Wunsch 27.11.2026, Stand .24: „… dass die Bilder den kompletten Tisch, also das Rechteck ausfüllen“) */
+.platz .karte { width: 100%; max-width: none; height: auto; align-self: stretch; container-type: inline-size; }
 .platz .name { font-size: clamp(12px, 9cqw, 16px); }
 /* Passt der Sitzplan nicht in die Höhe (iPad quer, Notebook), rückt alles enger zusammen; die Bildgröße setzt einpassen() in app.js
    (iPad-Test 27.11.2026: vorderste Reihe und Tafel lagen unter dem Bildschirmrand). */
 body.eng .raum { padding-top: 10px; padding-bottom: 10px; }
 body.eng .tafel { margin-top: 8px; padding: 4px; }
 body.eng .platz { padding: 3px; }
-body.eng .platz .karte { padding: 4px 3px; gap: 2px; }
-body.eng .platz .name { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* eine Zeile: Vorname bleibt lesbar, das Bild wird größer */
+body.eng .platz .name { display: block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* eine Zeile: Vorname bleibt lesbar, vom Bild bleibt mehr zu sehen */
 .anw-kurz { display: none; }
 body.eng .anw-kurz { display: inline; }
 body.eng .anw-lang { display: none; }
 body.eng .anw-leiste > .leise, body.eng .werkzeug .nur-bearbeiten > .leise:last-child { display: none; } /* Hinweise kosten sonst bis zu zwei Zeilen */
-/* Schmale Karten (viele Plätze je Reihe): das Bild nimmt mehr von der Breite */
-@container (max-width: 64px) { .platz .bild { width: min(84cqw, var(--bild-max, 140px)); font-size: min(28cqw, calc(var(--bild-max, 140px) * .33)); } }
+/* Schmale Karten (viele Plätze je Reihe): Kürzel ohne Foto etwas größer */
+@container (max-width: 64px) { .platz .karte .bild { font-size: min(28cqw, calc(var(--platz-h, 120px) * .3)); } }
 /* Kopfleiste auf dem iPad quer in einer Zeile halten */
 @media (max-width: 1200px) { .app-name, .werkzeug .lbl { display: none; } #klasse { max-width: 200px; } }
 /* Nur Vorname, doppelte rot (Wunsch 27.11.2026) */
@@ -131,8 +129,8 @@ body.bearbeiten .platz .nr { display: block; }
 .ablage-box { margin-top: 14px; }
 .ablage { display: flex; flex-wrap: wrap; gap: 8px; min-height: 116px; border: 2px dashed var(--linie); border-radius: 12px; padding: 8px; }
 .karte {
-  width: 100px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: pointer;
-  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 7px 4px; border-radius: 12px;
+  width: 100px; height: 96px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: pointer;
+  display: block; padding: 0; border-radius: 12px;
   background: var(--flaeche); border: 2px solid var(--linie); position: relative;
 }
 .karte { touch-action: none; } /* Ziehen auf dem iPad in beiden Betriebsarten */
@@ -145,6 +143,23 @@ body.bearbeiten .karte { cursor: grab; }
 .bild { width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 19px; overflow: hidden; flex: none; }
 .bild img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
 .name { font-size: 12px; text-align: center; line-height: 1.2; word-break: break-word; }
+/* Auf der Karte: das Foto als Rechteck über die ganze Karte (Wunsch 27.11.2026: „Momentan werden die Bilder rund zugeschnitten. Bitte macht es so,
+   dass die Bilder den kompletten Tisch, also das Rechteck ausfüllen. Der Name steht dann unten über dem Bild, ist aber farblich so hinterlegt,
+   dass man es trotz Bild lesen kann.“). Name unten auf einem dunklen Streifen; doppelte Namen auf rotem Streifen, ein zugeschalteter Nachname rot
+   hinterlegt (rote Schrift wäre auf dem dunklen Streifen schlecht lesbar). Punkt, Haken, Note und Abzeichen liegen in den Ecken darüber.
+   Ohne Foto: Farbfläche mit Kürzel. Das runde Bild in der Seitenspalte bleibt rund. */
+.karte .bild { position: absolute; inset: 0; width: auto; height: auto; border-radius: 10px; padding-bottom: 18px; font-size: 24px; }
+.karte .bild img { object-position: 50% 35%; } /* Zuschnitte sind quadratisch, Tische breiter als hoch: eher oben lassen, damit das Gesicht bleibt */
+.platz .karte .bild { font-size: min(21cqw, calc(var(--platz-h, 120px) * .3)); }
+.karte .name { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; padding: 2px 5px 3px; border-radius: 0 0 10px 10px;
+  background: rgba(10, 14, 20, .66); color: #fff; font-weight: 600; text-shadow: 0 1px 2px rgba(0, 0, 0, .5);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.karte .name.doppelt { background: var(--w5); color: #fff; }
+.karte .name .nn { color: #fff; background: var(--w5); border-radius: 4px; padding: 0 3px; }
+.karte .punkt, .karte .haken, .karte .note, .karte .st-zahl { z-index: 2; }
+.karte .punkt, .karte .haken { box-shadow: 0 0 0 2px #fff; }
+.karte.blitz { animation: blitz-rand .6s; } /* der alte Hintergrund-Blitz läge unter dem Foto */
+@keyframes blitz-rand { 0% { box-shadow: 0 0 0 5px var(--gruen); } 100% { box-shadow: 0 0 0 0 transparent; } }
 .punkt { position: absolute; top: 6px; right: 8px; width: 11px; height: 11px; border-radius: 50%; background: var(--grau); }
 .punkt.da { background: var(--gruen); }
 .haken { position: absolute; top: 4px; left: 6px; width: 15px; height: 15px; border-radius: 50%; background: var(--akzent); color: #fff; font-size: 10px; font-weight: 700; line-height: 15px; text-align: center; }

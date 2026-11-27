@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.23';
+  const STAND = '2026-11-27.24';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -332,8 +332,7 @@
     const tafelH = tafel.getBoundingClientRect().height + parseFloat(getComputedStyle(tafel).marginTop);
     const gaenge = [...plaetzeEl.querySelectorAll('.reihen-gang')].reduce((s, e) => s + e.getBoundingClientRect().height, 0);
     const proReihe = Math.floor((nutzbar() - imRaum(plaetzeEl.getBoundingClientRect().top) - tafelH - gaenge) / reihen);
-    p.setProperty('--platz-h', Math.max(56, Math.min(120, proReihe)) + 'px');
-    for (let b = 140; b >= 28 && !passt(); b -= 4) p.setProperty('--bild-max', b + 'px');
+    p.setProperty('--platz-h', Math.max(56, Math.min(120, proReihe)) + 'px'); // seit Stand .24 füllt das Foto den Tisch – die Tischhöhe genügt
   }
   if (typeof ResizeObserver === 'function') new ResizeObserver(() => einpassen()).observe($('raum'));
 
