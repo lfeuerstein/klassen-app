@@ -1,6 +1,6 @@
 /* Klassen-App: hält die Programmdateien auf dem Gerät, damit die App ohne Internet startet.
    Es werden nur die eigenen Programmdateien zwischengespeichert, keine Daten. */
-const CACHE = 'klassen-app-2026-11-27-8';
+const CACHE = 'klassen-app-2026-11-27-10';
 const DATEIEN = ['./', 'index.html', 'app.css', 'app.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {

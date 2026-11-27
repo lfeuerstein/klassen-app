@@ -3,7 +3,9 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.8';
+  const STAND = '2026-11-27.10';
+  // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
+  const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
   const WFARBE = { '++': 'var(--w1)', '+': 'var(--w2)', 'o': 'var(--w3)', '-': 'var(--w4)', '--': 'var(--w5)' };
   const ZEIG = (w) => w.replace(/-/g, '−');
@@ -45,6 +47,7 @@
 
   let schreibt = false, nochmal = false;
   async function sichern() {
+    if (IN_MOODLE) { moodleMerken(); return; }
     if (schreibt) { nochmal = true; return; }
     schreibt = true;
     try { do { nochmal = false; await DB.schreib('kv', 'zustand', st); } while (nochmal); }
@@ -122,7 +125,7 @@
 
   function bildEl(s) {
     const b = document.createElement('div'); b.className = 'bild';
-    const f = fotos.get(s.id);
+    const f = fotos.get(s.id) || s.profilbild;
     if (f) { const i = new Image(); i.src = f; i.alt = ''; b.append(i); b.style.background = 'var(--linie)'; }
     else { b.style.background = farbe(s.name); b.textContent = kuerzel(s.name); }
     return b;
@@ -440,7 +443,7 @@
     const a = e.target.closest('[data-aktion]'); if (!a) return;
     const offen = a.closest('dialog'); if (offen) offen.close();
     ({ import: importOeffnen, fotos: fotosOeffnen, klassen: klassenOeffnen, kriterien: kriterienOeffnen, sichern: sicherungSpeichern,
-       laden: () => $('sicherungDatei').click(), beispiel: beispielAnlegen })[a.dataset.aktion]();
+       laden: () => $('sicherungDatei').click(), beispiel: beispielAnlegen, moodleKlasse: mkOeffnen })[a.dataset.aktion]();
   });
   $('menueKnopf').addEventListener('click', () => $('menueDlg').showModal());
 
@@ -462,7 +465,7 @@
       xb.addEventListener('click', () => {
         if (!confirm(s.name + ' mit allen Bewertungen und dem Foto aus dieser Klasse entfernen?')) return;
         d.schueler = d.schueler.filter((y) => y.id !== s.id); const p = platzVon(s.id); if (p) delete d.plaetze[p];
-        delete d.protokoll[s.id]; fotos.delete(s.id); DB.loesch('fotos', s.id).catch(() => {});
+        delete d.protokoll[s.id]; if (fotos.has(s.id)) moodleFoto(s.id, null); fotos.delete(s.id); DB.loesch('fotos', s.id).catch(() => {});
         if (gewaehlt === s.id) gewaehlt = null; zeichneKlassenDlg(); zeichne();
       });
       x.append(xb); tr.append(n, m, x); t.append(tr);
@@ -476,7 +479,7 @@
   $('klasseLoeschen').addEventListener('click', () => {
     const d = kd(); if (!d) return;
     if (!confirm('Klasse „' + d.name + '“ mit ' + d.schueler.length + ' Schülern, allen Bewertungen und Fotos löschen? Das lässt sich nicht rückgängig machen.')) return;
-    for (const s of d.schueler) { fotos.delete(s.id); DB.loesch('fotos', s.id).catch(() => {}); }
+    for (const s of d.schueler) { if (fotos.has(s.id)) moodleFoto(s.id, null); fotos.delete(s.id); DB.loesch('fotos', s.id).catch(() => {}); }
     delete st.klassen[st.klasse]; st.klasse = klassenSortiert()[0] || null; gewaehlt = null; zeichneKlassenDlg(); zeichne();
   });
   $('schuelerAnlegen').addEventListener('click', () => {
@@ -632,7 +635,10 @@
     t.insertAdjacentHTML('beforeend', '<tr><td colspan="5" class="leise">* Linearer Schlüssel: Note 1,0 = 100 Punkte, 3,5 = 50 Punkte, 6,0 = 0 Punkte.</td></tr>');
     $('csvKnopf').disabled = !z.some((r) => r.s.mail);
   }
-  $('exportKnopf').addEventListener('click', () => { if (!kd()) { importOeffnen(); return; } zeichneExport(); $('exportDlg').showModal(); });
+  $('exportKnopf').addEventListener('click', () => {
+    if (!kd()) { (IN_MOODLE ? mkOeffnen : importOeffnen)(); return; }
+    zeichneExport(); $('exportDlg').showModal(); if (IN_MOODLE) mdVorbereiten();
+  });
   $('zeitraum').addEventListener('change', zeichneExport);
   $('csvKnopf').addEventListener('click', () => {
     const esc = (x) => '"' + String(x).replace(/"/g, '""') + '"';
@@ -703,11 +709,11 @@
     const out = document.createElement('canvas'); out.width = out.height = 320; fotoMalen(out.getContext('2d'), 320);
     const daten = out.toDataURL('image/jpeg', 0.85);
     try { await DB.schreib('fotos', foto.s.id, daten); } catch (e) { alert('Das Foto ließ sich nicht speichern: ' + (e && e.message || e)); return; }
-    fotos.set(foto.s.id, daten); $('fotoDlg').close(); zeichne();
+    fotos.set(foto.s.id, daten); moodleFoto(foto.s.id, daten); $('fotoDlg').close(); zeichne();
   });
   $('fotoLoeschen').addEventListener('click', async () => {
     if (!foto.s || !confirm('Foto von ' + foto.s.name + ' entfernen?')) return;
-    await DB.loesch('fotos', foto.s.id).catch(() => {}); fotos.delete(foto.s.id); $('fotoDlg').close(); zeichne();
+    await DB.loesch('fotos', foto.s.id).catch(() => {}); fotos.delete(foto.s.id); moodleFoto(foto.s.id, null); $('fotoDlg').close(); zeichne();
   });
   $('fotoDlg').addEventListener('close', () => { if (foto.url) { URL.revokeObjectURL(foto.url); foto.url = null; } foto.img = null; $('fotoCanvas').getContext('2d').clearRect(0, 0, C, C); });
 
@@ -811,7 +817,7 @@
     for (const f of bereit) {
       const daten = quadratBild(f.img);
       try { await DB.schreib('fotos', f.sid, daten); } catch (e) { alert('Ein Foto ließ sich nicht speichern: ' + (e && e.message || e)); break; }
-      fotos.set(f.sid, daten); n++;
+      fotos.set(f.sid, daten); moodleFoto(f.sid, daten); n++;
     }
     $('fotosDlg').close(); zeichne();
     zeigeMeldung(n + (n === 1 ? ' Foto' : ' Fotos') + ' übernommen. Den Ausschnitt kannst du über das Foto des Schülers nachbessern.');
@@ -851,9 +857,264 @@
     freiSetzen(d, d.schueler.map((s) => s.id)); gewaehlt = null; zeichne();
   }
 
+  // ---------- Moodle-Fassung (Stufe 2, Wunsch 27.11.2026) ----------
+  // Liegt die App als Datei in einem Moodle-Kurs, arbeitet sie mit der Anmeldung des Lehrers (kein Schlüssel nötig):
+  // Daten und Fotos in „Meine Dateien“ › klassen-app/ (nur für ihn sichtbar), Klassen aus Moodle-Kursen, Noten direkt in einen
+  // Bewertungsaspekt. Auf dem Gerät bleibt nur, was noch nicht gesendet ist. Die Wege sind am 27.11.2026 erprobt (03-Moodle.md).
+  const MO = { sk: '', ctx: '', repo: '4', rev: 0, zuletzt: null, bereit: false, laeuft: false, nochmal: false, timer: null, fotoAuftraege: new Map(), kurse: null };
+  const ORDNER = '/klassen-app/', FOTO_ORDNER = '/klassen-app/fotos/';
+  MO.ajax = async (methodname, args, nochmal = true) => {
+    try { return await MO.ajax1(methodname, args); } catch (e) {
+      // Nach einem neuen Bewertungsaspekt rechnet Moodle die Noten erst neu, wenn die Bewertungsübersicht geöffnet wird.
+      if (nochmal && /gradesneedregrading/.test(e.message) && args && args.courseid) {
+        await fetch('/grade/report/grader/index.php?id=' + args.courseid, { credentials: 'same-origin' }).then((r) => r.text()).catch(() => {});
+        return MO.ajax(methodname, args, false);
+      }
+      throw e;
+    }
+  };
+  MO.ajax1 = async (methodname, args) => {
+    if (!MO.sk) await MO.formular();
+    const r = await fetch('/lib/ajax/service.php?sesskey=' + encodeURIComponent(MO.sk) + '&info=' + methodname, {
+      method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify([{ index: 0, methodname, args }]) });
+    const j = await r.json().catch(() => null), e = Array.isArray(j) ? j[0] : j;
+    if (!e) throw new Error('Moodle antwortet nicht (' + r.status + ')');
+    if (e.error) { const x = e.exception || e; if (/sesskey|login/i.test(x.errorcode || '')) MO.sk = ''; throw new Error((x.message || x.error || 'Fehler') + (x.errorcode ? ' (' + x.errorcode + ')' : '')); }
+    return e.data;
+  };
+  // „Meine Dateien“ öffnen: liefert Sitzungsschlüssel, Benutzerkontext und einen frischen Entwurfsbereich mit allen vorhandenen Dateien
+  MO.formular = async () => {
+    const r = await fetch('/user/files.php', { credentials: 'same-origin', cache: 'no-store' });
+    const html = await r.text();
+    const sk = (html.match(/"sesskey":"([^"]+)"/) || [])[1];
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const feld = doc.querySelector('input[name="files_filemanager"]');
+    if (!sk || !feld) throw new Error('anmelden');
+    const js = [...doc.querySelectorAll('script')].map((s) => s.textContent).join('\n');
+    MO.sk = sk; MO.ctx = (js.match(/"context":\{"id":(\d+)/) || [])[1] || MO.ctx;
+    MO.repo = (js.match(/"type":"upload"[^}]*?"id":"?(\d+)/) || [])[1] || MO.repo;
+    return { doc, itemid: feld.value };
+  };
+  MO.adresse = (pfad, name) => '/pluginfile.php/' + MO.ctx + '/user/private' + pfad + encodeURIComponent(name);
+  MO.entwurf = async (aktion, daten) => {
+    const r = await fetch('/repository/draftfiles_ajax.php?action=' + aktion, { method: 'POST', credentials: 'same-origin', body: new URLSearchParams(Object.assign({ sesskey: MO.sk }, daten)) });
+    return r.json().catch(() => null);
+  };
+  // Dateien in „Meine Dateien“ schreiben oder löschen: [{ pfad, name, blob }] – blob null = löschen. Gespeichert wird wie im Moodle-Fenster.
+  MO.schreibe = async (auftraege) => {
+    const f = await MO.formular();
+    for (const a of auftraege) {
+      await MO.entwurf('delete', { itemid: f.itemid, filepath: a.pfad, filename: a.name });
+      if (!a.blob) continue;
+      const fd = new FormData();
+      fd.append('repo_upload_file', a.blob, a.name);
+      for (const [k, v] of Object.entries({ sesskey: MO.sk, repo_id: MO.repo, itemid: f.itemid, ctx_id: MO.ctx, savepath: a.pfad, title: a.name, author: '', env: 'filemanager' })) fd.append(k, v);
+      const j = await (await fetch('/repository/repository_ajax.php?action=upload', { method: 'POST', credentials: 'same-origin', body: fd })).json().catch(() => null);
+      if (!j || j.error || j.event === 'fileexists') throw new Error('Hochladen von ' + a.name + ' ging nicht' + (j && j.error ? ': ' + j.error : ''));
+    }
+    const form = f.doc.querySelector('form.mform') || f.doc.querySelector('form');
+    const fd = new URLSearchParams();
+    for (const e of form.elements) { if (!e.name || e.type === 'submit' || e.type === 'button') continue; fd.append(e.name, e.name === 'sesskey' ? MO.sk : e.value); }
+    if (!fd.has('sesskey')) fd.append('sesskey', MO.sk);
+    fd.set('files_filemanager', f.itemid);
+    const erg = await MO.ajax('core_form_dynamic_form', { form: 'core_user\\form\\private_files', formdata: fd.toString() });
+    if (!erg || !erg.submitted) throw new Error('Moodle hat „Meine Dateien“ nicht gespeichert');
+  };
+  MO.liste = async (pfad) => {
+    const f = await MO.formular(); const j = await MO.entwurf('list', { itemid: f.itemid, filepath: pfad });
+    return ((j && j.list) || []).filter((x) => x.type !== 'folder').map((x) => x.filename);
+  };
+  const speicherStand = (t) => { const e = $('speicherOrt'); if (e) e.textContent = t; };
+  async function moodleDatenLesen() {
+    const r = await fetch(MO.adresse(ORDNER, 'daten.json') + '?t=' + Date.now(), { credentials: 'same-origin', cache: 'no-store' });
+    if (r.status === 404) return null;
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j || j.app !== 'klassen-app') throw new Error('daten.json ließ sich nicht lesen (' + r.status + ')');
+    return j;
+  }
+  async function moodleFotosLaden() {
+    for (const n of await MO.liste(FOTO_ORDNER)) {
+      const id = n.replace(/\.jpg$/i, ''); if (!MO.fotoAuftraege.has(id)) fotos.set(id, MO.adresse(FOTO_ORDNER, n) + '?v=' + MO.rev);
+    }
+  }
+  function moodleMerken(sofort) {
+    if (!IN_MOODLE || !MO.bereit) return;
+    if (!sofort && JSON.stringify(st) === MO.zuletzt && !MO.fotoAuftraege.size) return;
+    DB.schreib('kv', 'ausstehend', st).catch(() => {});
+    clearTimeout(MO.timer); MO.timer = setTimeout(moodleSpeichern, 2500);
+    speicherStand('Daten in Moodle · wird gleich gespeichert …');
+  }
+  function moodleFoto(id, daten) { // daten = Bild als data-URL, null = Foto löschen
+    if (!IN_MOODLE) return;
+    MO.fotoAuftraege.set(id, daten); moodleMerken(true);
+  }
+  async function moodleSpeichern() {
+    if (MO.laeuft) { MO.nochmal = true; return; }
+    MO.laeuft = true; clearTimeout(MO.timer); MO.timer = null; speicherStand('Daten in Moodle · speichert …');
+    try {
+      do {
+        MO.nochmal = false;
+        const fern = await moodleDatenLesen();
+        if (fern && fern.rev !== MO.rev) {
+          const wann = new Date(fern.rev).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+          if (!confirm('Auf einem anderen Gerät wurde am ' + wann + ' gespeichert.\n\nOK: den Stand von diesem Gerät speichern (der andere wird überschrieben).\nAbbrechen: den anderen Stand laden (die Änderungen hier gehen verloren).')) {
+            st = Object.assign(grund(), fern.zustand); MO.rev = fern.rev; MO.zuletzt = JSON.stringify(st); MO.fotoAuftraege.clear(); fotos.clear();
+            await DB.loesch('kv', 'ausstehend').catch(() => {}); await DB.leeren('fotos').catch(() => {});
+            await moodleFotosLaden(); if (!st.klassen[st.klasse]) st.klasse = klassenSortiert()[0] || null; gewaehlt = null; zeichne();
+            break;
+          }
+        }
+        const rev = Math.max(Date.now(), (fern ? fern.rev : 0) + 1), jetzt = JSON.stringify(st);
+        const auftraege = [{ pfad: ORDNER, name: 'daten.json', blob: new Blob([JSON.stringify({ app: 'klassen-app', stand: STAND, rev, zustand: st })], { type: 'application/json' }) }];
+        const fotosJetzt = new Map(MO.fotoAuftraege);
+        for (const [id, url] of fotosJetzt) auftraege.push({ pfad: FOTO_ORDNER, name: id + '.jpg', blob: url ? await (await fetch(url)).blob() : null });
+        await MO.schreibe(auftraege);
+        MO.rev = rev; MO.zuletzt = jetzt;
+        for (const [id, url] of fotosJetzt) {
+          if (MO.fotoAuftraege.get(id) !== url) continue;
+          MO.fotoAuftraege.delete(id); DB.loesch('fotos', id).catch(() => {});
+          if (url) fotos.set(id, MO.adresse(FOTO_ORDNER, id + '.jpg') + '?v=' + rev);
+        }
+        if (JSON.stringify(st) === MO.zuletzt) await DB.loesch('kv', 'ausstehend').catch(() => {});
+        if (JSON.stringify(st) !== MO.zuletzt || MO.fotoAuftraege.size) MO.nochmal = true;
+      } while (MO.nochmal);
+      speicherStand('Daten in Moodle · gespeichert ' + uhrzeit());
+    } catch (e) {
+      const grund_ = e && e.message === 'anmelden' ? 'nicht bei Moodle angemeldet' : navigator.onLine === false ? 'offline' : (e && e.message) || 'Fehler';
+      speicherStand('⚠ Daten noch nicht in Moodle gespeichert (' + grund_ + ') – neuer Versuch in 30 s');
+      MO.timer = setTimeout(moodleSpeichern, 30000);
+    } finally { MO.laeuft = false; }
+  }
+  function moodleAnmeldeHinweis() {
+    const b = $('banner'); b.hidden = false; b.textContent = 'Nicht bei Moodle angemeldet. ';
+    const a = document.createElement('a'); a.href = '/login/index.php'; a.textContent = 'Jetzt anmelden'; b.append(a, ' – danach diese Seite neu laden.');
+  }
+  async function moodleStart() {
+    document.body.classList.add('moodle'); speicherStand('Daten in Moodle · verbinde …');
+    let lokal = null, fern = null, fehler = null;
+    try { lokal = await DB.lies('kv', 'ausstehend'); for (const [k, v] of await DB.alle('fotos')) { fotos.set(k, v); MO.fotoAuftraege.set(k, v); } } catch (e) { /* kein Zwischenspeicher */ }
+    try { await MO.formular(); fern = await moodleDatenLesen(); if (fern) MO.rev = fern.rev; await moodleFotosLaden(); } catch (e) { fehler = e; }
+    if (fern) st = Object.assign(grund(), fern.zustand);
+    MO.zuletzt = JSON.stringify(st);
+    if (lokal && lokal.klassen) st = Object.assign(grund(), lokal); // noch nicht Gesendetes geht vor
+    if (!st.klassen[st.klasse]) st.klasse = klassenSortiert()[0] || null;
+    MO.bereit = true; zeichne();
+    if (fehler) {
+      if (fehler.message === 'anmelden') moodleAnmeldeHinweis();
+      else banner('Moodle ist gerade nicht erreichbar (' + fehler.message + '). Du arbeitest mit dem Stand auf diesem Gerät; gespeichert wird, sobald Moodle wieder erreichbar ist.');
+      speicherStand('⚠ Daten noch nicht mit Moodle abgeglichen');
+      if ((lokal && lokal.klassen) || MO.fotoAuftraege.size) MO.timer = setTimeout(moodleSpeichern, 30000);
+    } else if ((lokal && lokal.klassen) || MO.fotoAuftraege.size) moodleMerken(true);
+    else speicherStand(fern ? 'Daten in Moodle · geladen ' + uhrzeit() : 'Daten in Moodle · noch nichts gespeichert');
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && MO.timer) moodleSpeichern(); });
+  }
+
+  // Klasse aus einem Moodle-Kurs übernehmen (nur bewertbare Teilnehmer, wahlweise eine Gruppe)
+  async function moodleKurse() {
+    if (!MO.kurse) {
+      const d = await MO.ajax('core_course_get_enrolled_courses_by_timeline_classification', { classification: 'all', limit: 0, offset: 0, sort: 'fullname' });
+      MO.kurse = (d.courses || []).map((c) => ({ id: c.id, name: c.fullname, bereich: c.coursecategory || '' }))
+        .sort((a, b) => (a.bereich + ' ' + a.name).localeCompare(b.bereich + ' ' + b.name, 'de'));
+    }
+    return MO.kurse;
+  }
+  const kursOptionen = (sel, kurse, wahl) => {
+    sel.innerHTML = ''; for (const k of kurse) sel.append(new Option((k.bereich ? k.bereich + ' › ' : '') + k.name, k.id));
+    if (wahl && !kurse.some((k) => k.id === wahl)) sel.prepend(new Option('Kurs ' + wahl, wahl));
+    if (wahl) sel.value = String(wahl);
+  };
+  // Kurse, in die der Lehrer nicht selbst eingeschrieben ist (Rechte über den Kursbereich), stehen nicht in der Liste → Nummer eintippen
+  const kursNummer = (sel, eingabe) => {
+    const n = Number(eingabe.value); eingabe.value = ''; if (!n) return false;
+    if (![...sel.options].some((o) => o.value === String(n))) sel.prepend(new Option('Kurs ' + n, n));
+    sel.value = String(n); return true;
+  };
+  const moodleFehler = (e) => (e && e.message === 'anmelden' ? 'Nicht bei Moodle angemeldet – bitte anmelden und die Seite neu laden.' : 'Fehler: ' + (e && e.message));
+  let mkListe = [];
+  async function mkOeffnen() {
+    $('mkVorschau').textContent = 'Kurse werden geladen …'; $('mkUebernehmen').disabled = true; $('mkDlg').showModal();
+    try { kursOptionen($('mkKurs'), await moodleKurse(), kd() && kd().kurs); await mkKursGewaehlt(); } catch (e) { $('mkVorschau').textContent = moodleFehler(e); }
+  }
+  async function mkKursGewaehlt() {
+    const g = $('mkGruppe'); g.innerHTML = ''; g.append(new Option('alle Schüler des Kurses', '0'));
+    try { for (const x of (await MO.ajax('core_group_get_course_groups', { courseid: Number($('mkKurs').value) })) || []) g.append(new Option(x.name, x.id)); } catch (e) { /* ohne Gruppen */ }
+    if (kd() && kd().gruppe && [...g.options].some((o) => o.value === String(kd().gruppe))) g.value = String(kd().gruppe);
+    await mkLaden();
+  }
+  async function mkLaden() {
+    $('mkVorschau').textContent = 'Schüler werden geladen …'; $('mkUebernehmen').disabled = true;
+    const kurs = Number($('mkKurs').value), gruppe = Number($('mkGruppe').value), args = { courseid: kurs };
+    if (gruppe) args.groupid = gruppe;
+    const d = await MO.ajax('core_grades_get_enrolled_users_for_selector', args);
+    mkListe = (d.users || []).map((u) => ({ mid: u.id, name: ((u.firstname || '') + ' ' + (u.lastname || '')).trim() || u.fullname, mail: u.email || '',
+      bild: /\/user\/icon\//.test(u.profileimageurl || '') ? u.profileimageurl : '' }));
+    const z = $('mkZiel'); z.innerHTML = ''; z.append(new Option('als neue Klasse', ''));
+    for (const id of klassenSortiert()) z.append(new Option('Klasse „' + st.klassen[id].name + '“ ergänzen', id));
+    z.value = klassenSortiert().find((id) => st.klassen[id].kurs === kurs && (st.klassen[id].gruppe || 0) === gruppe) || '';
+    $('mkNeuName').value = gruppe ? $('mkGruppe').selectedOptions[0].textContent : $('mkKurs').selectedOptions[0].textContent.replace(/^.* › /, '');
+    $('mkNeuName').hidden = !!z.value;
+    const mitBild = mkListe.filter((u) => u.bild).length;
+    $('mkVorschau').textContent = mkListe.length + ' Schüler ' + (gruppe ? 'in dieser Gruppe' : 'in diesem Kurs') + ' (nur bewertbare, ohne Lehrkräfte)' + (mitBild ? ', ' + mitBild + ' mit Profilbild' : '') + '.';
+    $('mkUebernehmen').disabled = !mkListe.length;
+  }
+  $('mkKurs').addEventListener('change', () => mkKursGewaehlt().catch((e) => { $('mkVorschau').textContent = moodleFehler(e); }));
+  $('mkKursNr').addEventListener('change', () => { if (kursNummer($('mkKurs'), $('mkKursNr'))) mkKursGewaehlt().catch((e) => { $('mkVorschau').textContent = moodleFehler(e); }); });
+  $('mdKursNr').addEventListener('change', () => { if (kursNummer($('mdKurs'), $('mdKursNr'))) mdAspekte().catch((e) => { $('mdInfo').textContent = moodleFehler(e); }); });
+  $('mkGruppe').addEventListener('change', () => mkLaden().catch((e) => { $('mkVorschau').textContent = moodleFehler(e); }));
+  $('mkZiel').addEventListener('change', () => { $('mkNeuName').hidden = !!$('mkZiel').value; });
+  $('mkUebernehmen').addEventListener('click', () => {
+    const kurs = Number($('mkKurs').value), gruppe = Number($('mkGruppe').value);
+    if ($('mkZiel').value) st.klasse = $('mkZiel').value; else klasseAnlegen($('mkNeuName').value || 'Neue Klasse');
+    const d = kd(); d.kurs = kurs; d.gruppe = gruppe;
+    const neu = []; let schonDa = 0;
+    for (const u of mkListe) {
+      let s = d.schueler.find((x) => x.mid === u.mid || (u.mail && x.mail && x.mail.toLowerCase() === u.mail.toLowerCase()));
+      if (s) { s.mid = u.mid; s.name = u.name; if (u.mail) s.mail = u.mail; s.profilbild = u.bild; schonDa++; }
+      else { s = { id: 'm' + u.mid, name: u.name, mail: u.mail, mid: u.mid, profilbild: u.bild }; d.schueler.push(s); neu.push(s.id); }
+    }
+    freiSetzen(d, neu); gewaehlt = null; $('mkDlg').close(); zeichne();
+    zeigeMeldung(neu.length + ' Schüler neu, ' + schonDa + ' schon vorhanden. Die Klasse „' + d.name + '“ ist mit dem Moodle-Kurs verbunden.');
+  });
+
+  // Noten direkt in einen Bewertungsaspekt eintragen – wie in Moodle unter Bewertungen › Einzelansicht von Hand
+  async function mdVorbereiten() {
+    $('mdInfo').textContent = 'Kurse werden geladen …'; $('mdEintragen').disabled = true;
+    try { kursOptionen($('mdKurs'), await moodleKurse(), kd().kurs); await mdAspekte(); } catch (e) { $('mdInfo').textContent = moodleFehler(e); }
+  }
+  async function mdAspekte() {
+    const sel = $('mdAspekt'); sel.innerHTML = ''; $('mdEintragen').disabled = true; $('mdInfo').textContent = 'Bewertungsaspekte werden geladen …';
+    const d = await MO.ajax('core_grades_get_gradeitems', { courseid: Number($('mdKurs').value) });
+    for (const g of d.gradeItems || []) sel.append(new Option(g.itemname + (g.category ? ' – ' + g.category : ''), g.id));
+    if (kd().aspekt && [...sel.options].some((o) => o.value === String(kd().aspekt))) sel.value = String(kd().aspekt);
+    $('mdEintragen').disabled = !sel.options.length;
+    $('mdInfo').textContent = sel.options.length
+      ? 'Den Bewertungsaspekt (z. B. „Arbeiten im Unterricht“ unter Projektkompetenz › Pflicht) legst du einmal in Moodle an: Bewertungen › Bewertungen einrichten › Hinzufügen › Bewertungsaspekt.'
+      : 'In diesem Kurs gibt es noch keinen Bewertungsaspekt. Lege ihn in Moodle an: Bewertungen › Bewertungen einrichten › Hinzufügen › Bewertungsaspekt.';
+  }
+  $('mdKurs').addEventListener('change', () => mdAspekte().catch((e) => { $('mdInfo').textContent = moodleFehler(e); }));
+  $('mdEintragen').addEventListener('click', async () => {
+    const d = kd(), kurs = Number($('mdKurs').value), item = Number($('mdAspekt').value), aspekt = $('mdAspekt').selectedOptions[0].textContent;
+    const zeilen = exportZeilen().filter((r) => r.note !== null), mit = zeilen.filter((r) => r.s.mid), ohne = zeilen.length - mit.length;
+    if (!mit.length) { alert('Es gibt noch keine Noten von Schülern, die aus Moodle übernommen wurden.'); return; }
+    if (!confirm(mit.length + (mit.length === 1 ? ' Note' : ' Noten') + ' mit Feedback in „' + aspekt + '“ eintragen?\nVorhandene Werte dieser Schüler in diesem Bewertungsaspekt werden ersetzt.' + (ohne ? '\n' + ohne + ' Schüler ohne Moodle-Konto werden übersprungen.' : ''))) return;
+    $('mdInfo').textContent = 'Wird eingetragen …'; $('mdEintragen').disabled = true;
+    try {
+      if (!MO.sk) await MO.formular();
+      const fd = new URLSearchParams({ sesskey: MO.sk, itemid: String(item) });
+      for (const r of mit) { fd.append('finalgrade_' + item + '_' + r.s.mid, String(r.punkte)); fd.append('feedback_' + item + '_' + r.s.mid, r.feedback); }
+      const res = await fetch('/grade/report/singleview/index.php?id=' + kurs + '&item=grade&itemid=' + item, { method: 'POST', credentials: 'same-origin', body: fd });
+      const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+      const meldung = [...doc.querySelectorAll('.alert')].map((e) => e.textContent.replace(/Systemnachricht schließen|×/g, '').replace(/\s+/g, ' ').trim()).filter(Boolean).join(' · ');
+      d.kurs = kurs; d.aspekt = item; sichern();
+      $('mdInfo').textContent = (meldung || 'Antwort von Moodle: ' + res.status) + ' – prüfen in Moodle unter Bewertungen › Einzelansicht.';
+    } catch (e) { $('mdInfo').textContent = moodleFehler(e); }
+    $('mdEintragen').disabled = false;
+  });
+
   // ---------- Start ----------
   async function start() {
     $('stand').textContent = 'Stand ' + STAND;
+    if (IN_MOODLE) { await moodleStart(); return; }
     try {
       const z = await DB.lies('kv', 'zustand');
       if (z && z.klassen) st = Object.assign(grund(), z);
@@ -866,6 +1127,6 @@
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
   }
-  window.__klassenApp = { stand: STAND, zustand: () => st, fotoAnzahl: () => fotos.size, bildVerkleinern };
+  window.__klassenApp = { stand: STAND, zustand: () => st, fotoAnzahl: () => fotos.size, bildVerkleinern, moodle: IN_MOODLE, speichereJetzt: () => moodleSpeichern() };
   start();
 })();

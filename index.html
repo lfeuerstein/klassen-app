@@ -40,7 +40,8 @@
       <h2>Noch keine Klasse</h2>
       <p class="leise">Lege eine Klasse an. Die Namen kommen am einfachsten aus der Teilnehmerliste des Moodle-Kurses.</p>
       <div class="zeile">
-        <button class="haupt" data-aktion="import">Teilnehmer aus Moodle …</button>
+        <button class="haupt nur-moodle" data-aktion="moodleKlasse">Klasse aus einem Moodle-Kurs …</button>
+        <button class="haupt nicht-moodle" data-aktion="import">Teilnehmer aus Moodle …</button>
         <button data-aktion="klassen">Klasse von Hand anlegen …</button>
         <button data-aktion="beispiel">Beispielklasse zum Ausprobieren</button>
       </div>
@@ -66,21 +67,25 @@
   <span id="heuteZahl"></span>
   <span>● grün = heute bewertet · ● rot = heute abwesend · ● orange = später gekommen</span>
   <span id="sicherungHinweis"></span>
-  <span class="rechts"><span>Daten liegen nur auf diesem Gerät</span><span id="stand" class="leise"></span></span>
+  <span class="rechts"><span id="speicherOrt">Daten liegen nur auf diesem Gerät</span><span id="stand" class="leise"></span></span>
 </footer>
 
 <!-- Mehr … -->
 <dialog id="menueDlg">
   <div class="dk"><h3>Mehr</h3></div>
   <div class="di menue">
-    <button data-aktion="import">Teilnehmer aus Moodle übernehmen …</button>
+    <button data-aktion="moodleKlasse" class="nur-moodle">Klasse aus einem Moodle-Kurs übernehmen …</button>
+    <button data-aktion="import">Teilnehmer aus Moodle übernehmen (CSV-Datei) …</button>
     <button data-aktion="fotos">Fotos hochladen und zuordnen …</button>
     <button data-aktion="klassen">Klassen und Schüler verwalten …</button>
     <button data-aktion="kriterien">Kriterien der Projektkompetenz …</button>
-    <button data-aktion="sichern">Sicherung speichern (alle Klassen, Fotos und Bewertungen)</button>
-    <button data-aktion="laden">Sicherung laden …</button>
+    <button data-aktion="sichern" class="nicht-moodle">Sicherung speichern (alle Klassen, Fotos und Bewertungen)</button>
+    <button data-aktion="laden" class="nicht-moodle">Sicherung laden …</button>
     <button data-aktion="beispiel">Beispielklasse mit erfundenen Namen anlegen</button>
-    <div class="anleitung"><b>Als App auf dem iPad ablegen:</b>
+    <div class="anleitung nur-moodle"><b>Diese Fassung liegt in Moodle.</b> Alle Daten und Fotos speichert sie in deinen „Meine Dateien“ im Ordner
+      „klassen-app“ – nur du siehst sie. iPad und Notebook zeigen dasselbe. Auf dem iPad: diese Seite in Safari öffnen, Teilen › „Zum Home-Bildschirm“;
+      beim ersten Start dort einmal bei Moodle anmelden.</div>
+    <div class="anleitung nicht-moodle"><b>Als App auf dem iPad ablegen:</b>
       <ol><li>Diese Seite in Safari öffnen.</li><li>Auf „Teilen“ tippen (Kästchen mit Pfeil nach oben).</li><li>„Zum Home-Bildschirm“ wählen, dann „Hinzufügen“.</li></ol>
       <div class="leise" style="margin-top:6px">Danach immer über das Symbol auf dem Home-Bildschirm starten. Löschst du das Symbol, sind auch die Daten weg – vorher eine Sicherung speichern.</div>
     </div>
@@ -140,9 +145,18 @@
       <label>Zeitraum <select id="zeitraum"><option value="alle">ganzes Schuljahr</option><option value="30">letzte 30 Tage</option><option value="heute">nur heute</option></select></label>
     </div>
     <p class="leise" style="margin:0">So sieht es jeder Schüler in Moodle unter „Bewertungen“: die Punkte als Bewertung, darunter das Feedback.</p>
+    <div class="anleitung nur-moodle"><b>Direkt in Moodle eintragen</b>
+      <div class="zeile" style="align-items:center;margin-top:6px">
+        <label>Kurs <select id="mdKurs"></select></label>
+        <label class="leise">oder Kursnummer <input type="number" id="mdKursNr" inputmode="numeric" placeholder="z. B. 3176" style="width:8em;min-width:0;flex:none"></label>
+        <label>Bewertungsaspekt <select id="mdAspekt"></select></label>
+        <button id="mdEintragen" class="haupt" disabled>In Moodle eintragen</button>
+      </div>
+      <div id="mdInfo" class="leise" style="margin-top:6px"></div>
+    </div>
     <div id="exportWarnung"></div>
     <table id="exportTabelle"></table>
-    <div class="anleitung"><b>In Moodle einlesen (etwa 1 Minute):</b>
+    <div class="anleitung nicht-moodle"><b>In Moodle einlesen (etwa 1 Minute):</b>
       <ol><li>Im Kurs: <i>Bewertungen → Import → CSV-Datei</i>.</li>
       <li>Die gespeicherte Datei wählen, Trennzeichen <i>Semikolon</i>, Kodierung <i>UTF-8</i>.</li>
       <li>Zuordnen: <i>E-Mail-Adresse</i> → <i>E-Mail-Adresse</i>, Spalte „Projektkompetenz“ → die Bewertung „Projektkompetenz“ (oder „Neue Bewertung“), <i>Feedback</i> → Feedback dieser Bewertung.</li></ol>
@@ -167,7 +181,7 @@
       <label>Größe <input type="range" id="fotoZoom" min="1" max="4" step="0.01" value="1"></label>
       <p class="leise" style="margin:0">Mit dem Finger verschieben, bis das Gesicht im Kreis sitzt.</p>
     </div>
-    <p class="leise" style="margin:0">Am Notebook geht auch Strg+V. Das Foto bleibt nur auf diesem Gerät.</p>
+    <p class="leise" style="margin:0">Am Notebook geht auch Strg+V. <span class="nicht-moodle">Das Foto bleibt nur auf diesem Gerät.</span><span class="nur-moodle">Das Foto wird in deinen Moodle-Dateien gespeichert (nur für dich sichtbar).</span></p>
   </div>
   <div class="df"><button id="fotoLoeschen" class="gefahr links">Foto entfernen</button><button data-zu>Abbrechen</button><button id="fotoSpeichern" class="haupt" disabled>Speichern</button></div>
 </dialog>
@@ -186,6 +200,25 @@
     <div id="fotosListe" class="fotos-liste"></div>
   </div>
   <div class="df"><span id="fotosInfo" class="links leise"></span><button data-zu>Abbrechen</button><button id="fotosUebernehmen" class="haupt" disabled>Übernehmen</button></div>
+</dialog>
+
+<!-- Moodle-Fassung: Klasse aus einem Moodle-Kurs (nur bewertbare Teilnehmer, wahlweise eine Gruppe) -->
+<dialog id="mkDlg">
+  <div class="dk"><h3>Klasse aus einem Moodle-Kurs übernehmen</h3></div>
+  <div class="di">
+    <div class="zeile" style="align-items:center">
+      <label>Kurs <select id="mkKurs"></select></label>
+      <label class="leise">oder Kursnummer <input type="number" id="mkKursNr" inputmode="numeric" placeholder="z. B. 3176" style="width:8em;min-width:0;flex:none"></label>
+      <label>Gruppe <select id="mkGruppe"></select></label>
+    </div>
+    <p id="mkVorschau" class="leise" style="margin:0"></p>
+    <p class="leise" style="margin:0">Namen, E-Mail-Adressen und vorhandene Profilbilder kommen aus Moodle. Bewertungen und Anwesenheit bleiben beim Ergänzen erhalten.</p>
+  </div>
+  <div class="df">
+    <label class="links leise">Ziel <select id="mkZiel"></select></label>
+    <input type="text" id="mkNeuName" placeholder="Name der neuen Klasse">
+    <button data-zu>Abbrechen</button><button id="mkUebernehmen" class="haupt" disabled>Übernehmen</button>
+  </div>
 </dialog>
 
 <!-- Liste für WebUntis: Anwesenheit am Ende der Stunde von Hand übertragen -->

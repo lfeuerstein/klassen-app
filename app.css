@@ -54,7 +54,7 @@ body.bearbeiten .ablage-box.nur-bearbeiten { display: block !important; }
 .haupt-bereich { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: 0; }
 .raum { padding: 14px; overflow: auto; }
 .tafel { background: var(--tafel); color: #e8f1ea; text-align: center; border-radius: 8px; padding: 6px; font-size: 12px; letter-spacing: .05em; margin: 14px auto 0; max-width: 420px; }
-:root { --gang-schmal: 10px; --gang-tippen: 22px; --gang-breit: 46px; }
+:root { --gang-schmal: 10px; --gang-tippen: 22px; --gang-breit: 26px; } /* Durchgang nur angedeutet (Wunsch 27.11.2026) */
 .plaetze { display: flex; flex-direction: column; }
 .reihe, .reihen-gang { display: grid; }
 .platz { min-height: 120px; padding: 5px; border: 2px dashed transparent; border-radius: 12px; background: var(--platz); display: flex; align-items: center; justify-content: center; position: relative; }
@@ -89,6 +89,9 @@ body.anwesenheit .karte.anw-offen { border-style: dashed; }
 .anw-wahl button.an.anw-weg { background: var(--w5); border-color: var(--w5); color: #fff; }
 .anw-wahl input[type=time] { min-height: 40px; font-size: 16px; }
 .zeile .schalter input { flex: none; min-width: 0; }
+/* Moodle-Fassung: Teile nur zeigen, wenn die App aus Moodle geöffnet ist (bzw. nur außerhalb) */
+body:not(.moodle) .nur-moodle { display: none !important; }
+body.moodle .nicht-moodle { display: none !important; }
 table.untis { width: 100%; border-collapse: collapse; font-size: 15px; }
 table.untis th, table.untis td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--linie); }
 table.untis tr.u-weg td { color: var(--w5); font-weight: 600; }
