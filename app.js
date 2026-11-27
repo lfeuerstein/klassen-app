@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.12';
+  const STAND = '2026-11-27.13';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -284,7 +284,7 @@
     $('anwDatum').textContent = new Date().toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
     const hatDaten = Object.values(st.klassen).some((k) => Object.values(k.protokoll).some((l) => l.length));
     const h = $('sicherungHinweis'); h.className = ''; h.textContent = '';
-    if (hatDaten) {
+    if (hatDaten && !IN_MOODLE) { // in der Moodle-Fassung liegen die Daten schon in Moodle, eine Sicherungsdatei gibt es dort nicht
       const tage = st.letzteSicherung ? Math.floor((Date.now() - st.letzteSicherung) / 864e5) : null;
       if (tage === null || tage >= 7) { h.className = 'warn'; h.textContent = '⚠ Letzte Sicherung: ' + (tage === null ? 'noch nie' : 'vor ' + tage + ' Tagen') + ' (Mehr … › Sicherung speichern)'; }
       else h.textContent = 'Letzte Sicherung: ' + new Date(st.letzteSicherung).toLocaleDateString('de-DE');
@@ -1095,6 +1095,7 @@
   async function mkKursGewaehlt() {
     const g = $('mkGruppe'); g.innerHTML = ''; g.append(new Option('alle Schüler des Kurses', '0'));
     try { for (const x of (await MO.ajax('core_group_get_course_groups', { courseid: Number($('mkKurs').value) })) || []) g.append(new Option(x.name, x.id)); } catch (e) { /* ohne Gruppen */ }
+    $('mkAlle').hidden = g.options.length < 2;
     if (kd() && kd().gruppe && [...g.options].some((o) => o.value === String(kd().gruppe))) g.value = String(kd().gruppe);
     await mkLaden();
   }
@@ -1102,9 +1103,7 @@
     $('mkVorschau').textContent = 'Schüler werden geladen …'; $('mkUebernehmen').disabled = true;
     const kurs = Number($('mkKurs').value), gruppe = Number($('mkGruppe').value), args = { courseid: kurs };
     if (gruppe) args.groupid = gruppe;
-    const d = await MO.ajax('core_grades_get_enrolled_users_for_selector', args);
-    mkListe = (d.users || []).map((u) => ({ mid: u.id, name: ((u.firstname || '') + ' ' + (u.lastname || '')).trim() || u.fullname, mail: u.email || '',
-      bild: /\/user\/icon\//.test(u.profileimageurl || '') ? u.profileimageurl : '' }));
+    mkListe = mkNutzer(await MO.ajax('core_grades_get_enrolled_users_for_selector', args));
     const z = $('mkZiel'); z.innerHTML = ''; z.append(new Option('als neue Klasse', ''));
     for (const id of klassenSortiert()) z.append(new Option('Klasse „' + st.klassen[id].name + '“ ergänzen', id));
     z.value = klassenSortiert().find((id) => st.klassen[id].kurs === kurs && (st.klassen[id].gruppe || 0) === gruppe) || '';
@@ -1119,18 +1118,53 @@
   $('mdKursNr').addEventListener('change', () => { if (kursNummer($('mdKurs'), $('mdKursNr'))) mdAspekte().catch((e) => { $('mdInfo').textContent = moodleFehler(e); }); });
   $('mkGruppe').addEventListener('change', () => mkLaden().catch((e) => { $('mkVorschau').textContent = moodleFehler(e); }));
   $('mkZiel').addEventListener('change', () => { $('mkNeuName').hidden = !!$('mkZiel').value; });
-  $('mkUebernehmen').addEventListener('click', () => {
-    const kurs = Number($('mkKurs').value), gruppe = Number($('mkGruppe').value);
-    if ($('mkZiel').value) st.klasse = $('mkZiel').value; else klasseAnlegen($('mkNeuName').value || 'Neue Klasse');
-    const d = kd(); d.kurs = kurs; d.gruppe = gruppe;
+  const mkNutzer = (d) => (d.users || []).map((u) => ({ mid: u.id, name: ((u.firstname || '') + ' ' + (u.lastname || '')).trim() || u.fullname, mail: u.email || '',
+    bild: /\/user\/icon\//.test(u.profileimageurl || '') ? u.profileimageurl : '' }));
+  // Schüler aus Moodle in Klasse d übernehmen: Vorhandene (gleiche Moodle-Nummer oder E-Mail) werden aktualisiert, Bewertungen bleiben.
+  function schuelerUebernehmen(d, liste) {
     const neu = []; let schonDa = 0;
-    for (const u of mkListe) {
+    for (const u of liste) {
       let s = d.schueler.find((x) => x.mid === u.mid || (u.mail && x.mail && x.mail.toLowerCase() === u.mail.toLowerCase()));
       if (s) { s.mid = u.mid; s.name = u.name; if (u.mail) s.mail = u.mail; s.profilbild = u.bild; schonDa++; }
       else { s = { id: 'm' + u.mid, name: u.name, mail: u.mail, mid: u.mid, profilbild: u.bild }; d.schueler.push(s); neu.push(s.id); }
     }
-    freiSetzen(d, neu); gewaehlt = null; $('mkDlg').close(); zeichne();
-    zeigeMeldung(neu.length + ' Schüler neu, ' + schonDa + ' schon vorhanden. Die Klasse „' + d.name + '“ ist mit dem Moodle-Kurs verbunden.');
+    freiSetzen(d, neu);
+    return { neu: neu.length, schonDa };
+  }
+  $('mkUebernehmen').addEventListener('click', () => {
+    const kurs = Number($('mkKurs').value), gruppe = Number($('mkGruppe').value);
+    if ($('mkZiel').value) st.klasse = $('mkZiel').value; else klasseAnlegen($('mkNeuName').value || 'Neue Klasse');
+    const d = kd(); d.kurs = kurs; d.gruppe = gruppe;
+    const z = schuelerUebernehmen(d, mkListe);
+    gewaehlt = null; $('mkDlg').close(); zeichne();
+    zeigeMeldung(z.neu + ' Schüler neu, ' + z.schonDa + ' schon vorhanden. Die Klasse „' + d.name + '“ ist mit dem Moodle-Kurs verbunden.');
+  });
+  // Jede Gruppe des Kurses als eigene Klasse (Wunsch 27.11.2026: Klassen automatisch aus den globalen Gruppen). Moodle gibt die Mitglieder
+  // einer globalen Gruppe nur über einen Kurs heraus, in den sie eingeschrieben ist – dort steht sie als Gruppe „<Name> (2026/27) Globale Gruppe“.
+  // Klassenname ohne Schuljahr und Zusatz; gibt es die Klasse (gleicher Kurs + Gruppe oder gleicher Name) schon, wird sie ergänzt.
+  $('mkAlle').addEventListener('click', async () => {
+    const kurs = Number($('mkKurs').value), gruppen = [...$('mkGruppe').options].filter((o) => o.value !== '0');
+    if (!gruppen.length) return;
+    $('mkAlle').disabled = true; $('mkUebernehmen').disabled = true;
+    const kurzName = (n) => n.replace(/\s*Globale Gruppe\s*$/i, '').replace(/\s*\(\d{4}\/\d{2}\)\s*$/, '').trim() || n;
+    const bericht = []; let erste = null;
+    try {
+      for (const o of gruppen) {
+        $('mkVorschau').textContent = 'Lade ' + o.textContent + ' …';
+        const liste = mkNutzer(await MO.ajax('core_grades_get_enrolled_users_for_selector', { courseid: kurs, groupid: Number(o.value) }));
+        if (!liste.length) { bericht.push(kurzName(o.textContent) + ': keine Schüler'); continue; }
+        const name = kurzName(o.textContent);
+        const da = klassenSortiert().find((id) => (st.klassen[id].kurs === kurs && st.klassen[id].gruppe === Number(o.value)) || st.klassen[id].name.trim().toLowerCase() === name.toLowerCase());
+        if (da) st.klasse = da; else klasseAnlegen(name);
+        const d = kd(); d.kurs = kurs; d.gruppe = Number(o.value);
+        const z = schuelerUebernehmen(d, liste); erste = erste || st.klasse;
+        bericht.push(name + ': ' + (da ? 'ergänzt' : 'neu') + ', ' + liste.length + ' Schüler');
+      }
+      if (erste) st.klasse = erste;
+      gewaehlt = null; $('mkDlg').close(); zeichne();
+      zeigeMeldung(bericht.join(' · '));
+    } catch (e) { $('mkVorschau').textContent = moodleFehler(e); }
+    $('mkAlle').disabled = false; $('mkUebernehmen').disabled = !mkListe.length;
   });
 
   // Noten direkt in einen Bewertungsaspekt eintragen – wie in Moodle unter Bewertungen › Einzelansicht von Hand
