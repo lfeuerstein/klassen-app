@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.17';
+  const STAND = '2026-11-27.18';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -303,6 +303,7 @@
   }
 
   const notenZeigen = () => document.body.classList.contains('noten-zeigen');
+  const offeneKriterien = new Set(); // aufgeklappte Eintragslisten „<Schüler>:<Kriterium>“ (nur in dieser Sitzung)
   function zeichneSeite() {
     seite.innerHTML = '';
     const s = gewaehlt && finde(gewaehlt);
@@ -328,18 +329,47 @@
     for (const k of st.kriterien) {
       const z = document.createElement('div'); z.className = 'kriterium';
       const t = document.createElement('div'); const je = nv.je[k.id];
-      t.innerHTML = '<div class="kn"></div><div class="ks"></div>';
+      t.innerHTML = '<div class="kn"></div>';
       t.querySelector('.kn').textContent = k.name + (k.gewicht !== 1 ? ' (×' + k.gewicht + ')' : '');
-      t.querySelector('.ks').textContent = je ? je.n + (je.n === 1 ? ' Eintrag' : ' Einträge') + (notenZeigen() ? ' · Ø ' + komma(je.m) : '') : 'noch nichts';
+      // Einträge je Kriterium aufklappen: Zeit, Wert, Bemerkung, löschen (Wunsch 27.11.2026)
+      const liste = (kd().protokoll[s.id] || []).filter((e) => e.k === k.id && e.w);
+      const schl = s.id + ':' + k.id, offen = liste.length > 0 && offeneKriterien.has(schl);
+      let ks;
+      if (liste.length) {
+        ks = document.createElement('button'); ks.type = 'button'; ks.className = 'ks ks-knopf';
+        ks.textContent = (offen ? '▾ ' : '▸ ') + liste.length + (liste.length === 1 ? ' Eintrag' : ' Einträge') + (je && notenZeigen() ? ' · Ø ' + komma(je.m) : '');
+        ks.addEventListener('click', () => { if (offen) offeneKriterien.delete(schl); else offeneKriterien.add(schl); zeichneSeite(); });
+      } else { ks = document.createElement('div'); ks.className = 'ks'; ks.textContent = 'noch nichts'; }
+      t.append(ks);
       const w = document.createElement('div'); w.className = 'werte';
       for (const x of ['++', '+', 'o', '-', '--']) {
         const bt = document.createElement('button'); bt.className = 'wert'; bt.dataset.w = x; bt.textContent = ZEIG(x); bt.title = k.name + ': ' + ZEIG(x);
-        bt.addEventListener('click', () => eintragen({ k: k.id, w: x })); w.append(bt);
+        // Steht etwas im Bemerkungsfeld, gehört es zu diesem Tipp (Wunsch 27.11.2026)
+        bt.addEventListener('click', () => { const b = seite.querySelector('input.bemerkung'), v = b ? b.value.trim() : ''; eintragen(v ? { k: k.id, w: x, text: v } : { k: k.id, w: x }); });
+        w.append(bt);
       }
-      z.append(t, w); seite.append(z);
+      z.append(t, w);
+      if (offen) {
+        const kl = document.createElement('div'); kl.className = 'k-liste';
+        for (const e of liste.slice().reverse()) {
+          const r = document.createElement('div'); r.className = 'k-eintrag';
+          const zt = document.createElement('span'); zt.className = 'zeit';
+          zt.textContent = new Date(e.zeit).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+          const m = document.createElement('span'); m.className = 'marke'; m.style.background = WFARBE[e.w]; m.textContent = ZEIG(e.w);
+          const tx = document.createElement('span'); tx.className = 'k-text'; tx.textContent = e.text || '';
+          const x = document.createElement('button'); x.type = 'button'; x.textContent = '✕'; x.title = 'Eintrag löschen';
+          x.addEventListener('click', () => {
+            if (!confirm('Eintrag löschen?\n' + ZEIG(e.w) + ' ' + k.name + ' vom ' + zt.textContent + (e.text ? '\n„' + e.text + '“' : ''))) return;
+            const l = kd().protokoll[s.id] || [], i = l.indexOf(e); if (i >= 0) l.splice(i, 1); zeichne();
+          });
+          r.append(zt, m, tx, x); kl.append(r);
+        }
+        z.append(kl);
+      }
+      seite.append(z);
     }
     const zb = document.createElement('div'); zb.className = 'zeile';
-    zb.innerHTML = '<input type="text" placeholder="Bemerkung, z. B. hat den Druckverlust gut erklärt" enterkeyhint="done"><button>Notieren</button>';
+    zb.innerHTML = '<input type="text" class="bemerkung" placeholder="Bemerkung – kommt an den nächsten Tipp oder mit „Notieren“ allein" enterkeyhint="done"><button>Notieren</button>';
     const inp = zb.querySelector('input');
     const notiere = () => { const v = inp.value.trim(); if (v) eintragen({ text: v }); };
     zb.querySelector('button').addEventListener('click', notiere);
@@ -375,7 +405,7 @@
       const zeit = document.createElement('span'); zeit.className = 'zeit';
       zeit.textContent = new Date(e.zeit).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
       const inh = document.createElement('span');
-      if (e.w) { const m = document.createElement('span'); m.className = 'marke'; m.style.background = WFARBE[e.w]; m.textContent = ZEIG(e.w); inh.append(m, ' ' + ((st.kriterien.find((k) => k.id === e.k) || {}).name || '(Kriterium entfernt)')); }
+      if (e.w) { const m = document.createElement('span'); m.className = 'marke'; m.style.background = WFARBE[e.w]; m.textContent = ZEIG(e.w); inh.append(m, ' ' + ((st.kriterien.find((k) => k.id === e.k) || {}).name || '(Kriterium entfernt)') + (e.text ? ' – ' + e.text : '')); }
       else inh.textContent = (e.abw ? '⦸ ' : '✎ ') + e.text;
       d.append(zeit, inh); pr.append(d);
     }
