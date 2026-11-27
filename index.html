@@ -26,6 +26,7 @@
     <label class="leise">Reihen <input type="number" id="reihen" min="1" max="8" inputmode="numeric"></label>
     <label class="leise">Plätze je Reihe <input type="number" id="spalten" min="2" max="10" inputmode="numeric"></label>
     <button id="schuelerPlus" title="Einen einzelnen Schüler in diese Klasse aufnehmen">+ Schüler …</button>
+    <button id="raumPlus" title="Einen eigenen Sitzplan für einen weiteren Raum anlegen (übernimmt zuerst diesen)">+ Raum …</button>
     <span class="leise">Zwischen zwei Tische tippen: dieses Stück wird Durchgang (ein/aus)</span>
   </span>
   <div class="rechts">
@@ -56,7 +57,7 @@
       </div>
       <div class="plaetze" id="plaetze"></div>
       <!-- Sicht des Lehrers (Wunsch 27.11.2026): Tafel und Lehrerpult unten, vorderste Reihe direkt darüber -->
-      <div class="tafel">Tafel · Lehrerpult</div>
+      <div class="tafel"><button type="button" id="raumKnopf" class="raum-knopf">+ Raum</button>Tafel · Lehrerpult</div>
       <div class="ablage-box nur-bearbeiten">
         <div class="leise" id="ablageTitel" style="margin-bottom:6px">Noch ohne Platz</div>
         <div class="ablage" id="ablage" data-ablage="1"></div>
@@ -108,6 +109,21 @@
     <div class="leise nur-moodle">Tipp: Wer in Moodle eingeschrieben ist, kommt besser über „Klasse aus SHK City …“ dazu – nur dann gehen seine Noten mit „Nach Moodle …“ in Moodle.</div>
   </div>
   <div class="df"><button data-zu>Abbrechen</button><button id="sdAnlegen" class="haupt">Hinzufügen</button></div>
+</dialog>
+
+<!-- Räume (Wunsch 27.11.2026): je Klasse ein eigener Sitzplan für jeden Raum -->
+<dialog id="raumDlg">
+  <div class="dk"><h3>Räume – <span id="rdKlasse"></span></h3></div>
+  <div class="di">
+    <div id="rdListe" class="raum-liste"></div>
+    <h4 style="margin:6px 0 0">Raum hinzufügen</h4>
+    <div class="zeile" id="rdErsterZeile"><input type="text" id="rdErster" list="raumNamen" placeholder="Name für den bisherigen Sitzplan, z. B. E 104" autocomplete="off" enterkeyhint="next"></div>
+    <div class="zeile"><input type="text" id="rdNeu" list="raumNamen" placeholder="Name des neuen Raums, z. B. Werkstatt W 2" autocomplete="off" enterkeyhint="done"><button id="rdHinzu" class="haupt">Raum hinzufügen</button></div>
+    <datalist id="raumNamen"></datalist>
+    <div class="leise">Der neue Raum übernimmt zuerst den Sitzplan, der gerade zu sehen ist (Tische, Durchgänge, Plätze). Was du danach dort umstellst,
+      bleibt nur in diesem Raum gespeichert. Schüler, Bewertungen, Anwesenheit und Fotos gehören zur Klasse und gelten in jedem Raum.</div>
+  </div>
+  <div class="df"><button data-zu class="haupt">Fertig</button></div>
 </dialog>
 
 <!-- Klassen und Schüler -->

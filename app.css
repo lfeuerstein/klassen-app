@@ -54,7 +54,7 @@ body.bearbeiten .ablage-box.nur-bearbeiten { display: block !important; }
 
 .haupt-bereich { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: 0; }
 .raum { padding: 14px; overflow: auto; }
-.tafel { background: var(--tafel); color: #e8f1ea; text-align: center; border-radius: 8px; padding: 6px; font-size: 12px; letter-spacing: .05em; margin: 14px auto 0; max-width: 420px; }
+.tafel { background: var(--tafel); color: #e8f1ea; text-align: center; border-radius: 8px; padding: 6px; font-size: 12px; letter-spacing: .05em; margin: 14px auto 0; max-width: 520px; }
 :root { --gang-schmal: 0px; --reihe-abstand: 8px; --gang-tippen: 22px; --gang-breit: 26px; } /* Durchgang nur angedeutet; ohne Durchgang stehen die Tische aneinander (Wünsche 27.11.2026) */
 .plaetze { display: flex; flex-direction: column; }
 .reihe, .reihen-gang { display: grid; }
@@ -81,6 +81,7 @@ body.eng .anw-leiste > .leise, body.eng .werkzeug .nur-bearbeiten > .leise:last-
 /* Nur Vorname, doppelte rot (Wunsch 27.11.2026) */
 .name.doppelt { color: var(--w5); font-weight: 700; }
 .nachname-zeigen { font-size: 14px; } .nachname-zeigen.doppelt { color: var(--w5); font-weight: 600; }
+.name .nn { color: var(--w5); font-weight: 700; } /* Nachname bei doppelten Vornamen rot (Wunsch 27.11.2026) */
 /* Klasse aus SHK City (Wunsch 27.11.2026) */
 .shk-liste { display: grid; gap: 8px; }
 .shk-liste button { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; text-align: left; min-height: 48px; }
@@ -236,3 +237,12 @@ body:not(.bearbeiten) .platz { padding-left: 0; padding-right: 0; border-left-wi
 .k-eintrag .zeit { color: var(--leise); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .k-eintrag .k-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .k-eintrag button { margin-left: auto; min-height: 30px; padding: 2px 10px; }
+/* Räume (Wunsch 27.11.2026): Knopf links in der Tafel-Leiste; Dialog mit den Räumen der Klasse */
+.tafel { position: relative; }
+.tafel .raum-knopf { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); max-width: 32%; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-size: 12px; line-height: 1.2; padding: 3px 9px; min-height: 0; letter-spacing: 0; color: inherit;
+  background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.5); border-radius: 6px; }
+.raum-liste { display: grid; gap: 6px; }
+.raum-zeile { align-items: center; }
+.raum-zeile .raum-name { flex: 1; text-align: left; }
+.raum-zeile .raum-name.an { border-color: var(--akzent); background: var(--akzent-weich); font-weight: 600; }

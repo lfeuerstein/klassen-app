@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.19';
+  const STAND = '2026-11-27.20';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -114,12 +114,54 @@
   const punkte = (note) => Math.round((6 - note) / 5 * 100);
   const sauber = (t) => String(t).normalize('NFKC').replace(/[^\p{L}\p{N}._-]+/gu, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').toLowerCase();
 
-  // Freie Plätze der Reihe nach füllen; wer keinen Platz findet, bleibt in der Ablage
+  // Freie Plätze der Reihe nach füllen; wer keinen Platz findet, bleibt in der Ablage. Gilt für den Raum, der gerade zu sehen ist,
+  // und für jeden anderen Raum der Klasse (Räume siehe unten).
   function freiSetzen(d, ids) {
-    const belegt = new Set(Object.keys(d.plaetze));
-    const frei = [];
-    for (let r = 1; r <= d.reihen; r++) for (let c = 1; c <= d.spalten; c++) { const p = 'r' + r + 'p' + c; if (!belegt.has(p)) frei.push(p); }
-    ids.forEach((id, i) => { if (frei[i]) d.plaetze[frei[i]] = id; });
+    const setze = (plan, liste) => {
+      if (!plan.plaetze) plan.plaetze = {};
+      const belegt = new Set(Object.keys(plan.plaetze)), frei = [];
+      for (let r = 1; r <= plan.reihen; r++) for (let c = 1; c <= plan.spalten; c++) { const p = 'r' + r + 'p' + c; if (!belegt.has(p)) frei.push(p); }
+      liste.forEach((id, i) => { if (frei[i]) plan.plaetze[frei[i]] = id; });
+    };
+    setze(d, ids);
+    for (const [rid, r] of Object.entries(d.raeume || {})) {
+      if (rid === d.raum || !r.reihen) continue;
+      const sitzt = new Set(Object.values(r.plaetze || {})); setze(r, ids.filter((id) => !sitzt.has(id)));
+    }
+  }
+
+  // ---------- Räume (Wunsch 27.11.2026: „Jeden Sitzplan … für jeden Raum individuell eintragen …, Raum hinzufügen, … erstmal der
+  // vorhandene Sitzplan übernommen, … hinter dem Raum gespeichert“). Der Sitzplan des Raums, der gerade zu sehen ist, steht wie
+  // bisher direkt in der Klasse (reihen, spalten, plaetze, gaenge); d.raeume[id] = { name, …Sitzplan } merkt sich die übrigen,
+  // d.raum ist der aktive Raum. Ohne d.raeume hat die Klasse einen Sitzplan ohne Raumnamen (ältere Daten bleiben gültig).
+  // Schüler, Bewertungen, Anwesenheit und Fotos gehören zur Klasse und gelten in jedem Raum.
+  const RAUM_FELDER = ['reihen', 'spalten', 'plaetze', 'gaenge'];
+  const kopie = (o) => JSON.parse(JSON.stringify(o === undefined ? null : o));
+  const raumListe = (d) => Object.keys((d && d.raeume) || {});
+  const raumName = (d) => (d && d.raeume && d.raeume[d.raum] ? d.raeume[d.raum].name : '');
+  function raumMerken(d) { // Sitzplan des aktiven Raums in seinen Eintrag schreiben
+    if (!d.raeume || !d.raeume[d.raum]) return;
+    for (const f of RAUM_FELDER) d.raeume[d.raum][f] = kopie(d[f] || (f === 'plaetze' || f === 'gaenge' ? {} : d[f]));
+  }
+  function raumWechseln(d, rid) {
+    if (!d.raeume || !d.raeume[rid] || rid === d.raum) return;
+    raumMerken(d);
+    const r = d.raeume[rid];
+    for (const f of RAUM_FELDER) if (r[f] !== undefined && r[f] !== null) d[f] = kopie(r[f]);
+    if (!d.plaetze) d.plaetze = {}; if (!d.gaenge) d.gaenge = {};
+    d.raum = rid;
+  }
+  function raumHinzu(d, name, ersterName) { // neuer Raum = Kopie des Sitzplans, der gerade zu sehen ist; danach ist er aktiv
+    if (!d.raeume) { const erst = neueId('r'); d.raeume = { [erst]: { name: ersterName || 'Raum 1' } }; d.raum = erst; }
+    raumMerken(d);
+    const rid = neueId('r'); d.raeume[rid] = { name };
+    d.raum = rid; raumMerken(d);
+    return rid;
+  }
+  function raumLoeschen(d, rid) {
+    if (!d.raeume || !d.raeume[rid] || raumListe(d).length < 2) return;
+    if (rid === d.raum) raumWechseln(d, raumListe(d).find((x) => x !== rid));
+    delete d.raeume[rid];
   }
   function klasseAnlegen(name) {
     const id = neueId('k');
@@ -140,15 +182,20 @@
     return b;
   }
   // Name auf der Karte (Wunsch 27.11.2026): wahlweise nur der Vorname (st.nurVorname, Menü „Mehr …“). Doppelte Vornamen sind rot; bei ihnen
-  // lässt sich der Nachname einzeln zuschalten (s.mitNachname, Seitenspalte). Vor-/Nachname kommen aus Moodle, sonst gilt das erste Wort.
+  // lässt sich der Nachname zuschalten (s.mitNachname, Seitenspalte) – seit Stand .20 für alle mit diesem Vornamen zugleich: Hat einer
+  // den Haken, zeigen alle Gleichnamigen den Nachnamen (rot). Vor-/Nachname kommen aus Moodle, sonst gilt das erste Wort.
   const vornameVon = (s) => s.vorname || String(s.name).trim().split(/\s+/)[0] || s.name;
   const nachnameVon = (s) => s.nachname || String(s.name).trim().split(/\s+/).slice(1).join(' ');
-  const kartenName = (s) => (st.nurVorname ? (s.mitNachname ? (vornameVon(s) + ' ' + nachnameVon(s)).trim() : vornameVon(s)) : s.name);
+  const mitNN = (s) => !!s.mitNachname || schueler().some((x) => x.mitNachname && vornameVon(x).toLowerCase() === vornameVon(s).toLowerCase());
+  const kartenName = (s) => (st.nurVorname ? (mitNN(s) ? (vornameVon(s) + ' ' + nachnameVon(s)).trim() : vornameVon(s)) : s.name);
   const gleicheVornamen = (s) => schueler().filter((x) => x.id !== s.id && vornameVon(x).toLowerCase() === vornameVon(s).toLowerCase()).length;
   const nameDoppelt = (s) => !!st.nurVorname && schueler().some((x) => x.id !== s.id && kartenName(x).toLowerCase() === kartenName(s).toLowerCase());
   function karte(s) {
     const k = document.createElement('div'); k.className = 'karte' + (s.id === gewaehlt ? ' gewaehlt' : ''); k.dataset.id = s.id; k.title = s.name;
-    const n = document.createElement('div'); n.className = 'name' + (nameDoppelt(s) ? ' doppelt' : ''); n.textContent = kartenName(s);
+    const n = document.createElement('div'); n.className = 'name' + (nameDoppelt(s) ? ' doppelt' : '');
+    if (st.nurVorname && mitNN(s) && nachnameVon(s)) { // Nachname rot (Wunsch 27.11.2026)
+      const nn = document.createElement('span'); nn.className = 'nn'; nn.textContent = nachnameVon(s); n.append(vornameVon(s) + ' ', nn);
+    } else n.textContent = kartenName(s);
     const heute = eintraege(s.id, 'heute'), a = anwHeute(s.id);
     k.classList.add('anw-' + (a ? a.s : 'offen'));
     // Punkt = Anwesenheit (grau offen, grün da, orange später, rot fehlt); blauer Haken = heute bewertet (Wunsch 27.11.2026)
@@ -178,6 +225,8 @@
     $('start').hidden = !!d; $('sitzplan').hidden = !d;
     if (!d) { gewaehlt = null; document.body.classList.remove('seite-offen'); zeichneSeite(); zeichneFuss(); einpassen(); return; }
     $('reihen').value = d.reihen; $('spalten').value = d.spalten;
+    const rk = $('raumKnopf'), rn = raumName(d); // Raumknopf an der Tafel: „+ Raum“ oder der Name des Raums
+    rk.textContent = rn ? rn + ' ▾' : '+ Raum'; rk.title = rn ? 'Raum „' + rn + '“ – tippen: Raum wechseln, hinzufügen, umbenennen' : 'Einen eigenen Sitzplan für einen weiteren Raum anlegen';
     // Jede Tischreihe hat ihre eigene Aufteilung: Zwischen zwei Tischen liegt ein breiter Durchgang nur dort, wo in DIESER Reihe ein
     // Gangstück eingetragen ist; sonst der normale schmale Abstand. Ein kleiner Versatz zwischen den Reihen ist gewollt (Wunsch
     // 27.11.2026). Gangstücke: 's<c>:<r>' = zwischen Platz c und c+1 in Reihe r; 'r<r>:<c>' = zwischen Reihe r und r+1 bei Platz c.
@@ -233,7 +282,7 @@
   function einpassen() {
     const raum = $('raum'), tafel = raum.querySelector('.tafel'), d = kd(), p = plaetzeEl.style;
     if (!d) { passSchluessel = ''; p.removeProperty('--platz-h'); p.removeProperty('--bild-max'); document.body.classList.remove('eng'); return; }
-    const schluessel = [raum.clientWidth, raum.clientHeight, st.klasse, d.reihen, d.spalten, d.schueler.length, modus, JSON.stringify(d.gaenge || {})].join('|');
+    const schluessel = [raum.clientWidth, raum.clientHeight, st.klasse, d.raum || '', d.reihen, d.spalten, d.schueler.length, modus, JSON.stringify(d.gaenge || {})].join('|');
     if (schluessel === passSchluessel) return;
     passSchluessel = schluessel;
     p.removeProperty('--platz-h'); p.removeProperty('--bild-max'); document.body.classList.remove('eng');
@@ -320,9 +369,11 @@
     kopf.append(b, h, g, zu); seite.append(kopf);
     if (st.nurVorname && gleicheVornamen(s)) {
       const l = document.createElement('label'); l.className = 'schalter nachname-zeigen' + (nameDoppelt(s) ? ' doppelt' : '');
-      const c = document.createElement('input'); c.type = 'checkbox'; c.checked = !!s.mitNachname;
-      c.addEventListener('change', () => { if (c.checked) s.mitNachname = true; else delete s.mitNachname; zeichne(); });
-      l.append(c, ' Den Vornamen „' + vornameVon(s) + '“ gibt es ' + (gleicheVornamen(s) + 1) + '× – Nachnamen auf der Karte zeigen');
+      const c = document.createElement('input'); c.type = 'checkbox'; c.checked = mitNN(s);
+      // gilt für alle mit diesem Vornamen (Wunsch 27.11.2026: „erscheint nur bei einem der doppelten Namen“)
+      const gleich = (x) => vornameVon(x).toLowerCase() === vornameVon(s).toLowerCase();
+      c.addEventListener('change', () => { for (const x of schueler()) if (gleich(x)) { if (c.checked) x.mitNachname = true; else delete x.mitNachname; } zeichne(); });
+      l.append(c, ' Den Vornamen „' + vornameVon(s) + '“ gibt es ' + (gleicheVornamen(s) + 1) + '× – bei allen den Nachnamen auf der Karte zeigen (rot)');
       seite.append(l);
     }
 
@@ -588,6 +639,7 @@
   function schuelerEntfernen(s) {
     const d = kd(); if (!d || !confirm(s.name + ' mit allen Bewertungen, der Anwesenheit und dem Foto aus der Klasse „' + d.name + '“ entfernen?\nDas lässt sich nicht rückgängig machen.')) return false;
     d.schueler = d.schueler.filter((y) => y.id !== s.id); const p = platzVon(s.id); if (p) delete d.plaetze[p];
+    for (const r of Object.values(d.raeume || {})) for (const [pl, id] of Object.entries(r.plaetze || {})) if (id === s.id) delete r.plaetze[pl]; // auch in den anderen Räumen
     delete d.protokoll[s.id]; for (const tag of Object.values(d.anwesenheit || {})) if (tag) delete tag[s.id];
     if (fotos.has(s.id)) { moodleFoto(s.id, null); originalMerken(s.id, null); } fotos.delete(s.id); DB.loesch('fotos', s.id).catch(() => {});
     if (gewaehlt === s.id) gewaehlt = null; zeichne(); zeigeMeldung(s.name + ' ist aus der Klasse „' + d.name + '“ entfernt.');
@@ -611,6 +663,57 @@
   $('sdVorname').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('sdNachname').focus(); } });
   $('sdNachname').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('sdMail').focus(); } });
   $('sdMail').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sdAnlegen(); } });
+  // ---------- Räume: Dialog (Knopf an der Tafel und „+ Raum …“ in „Sitzplan bearbeiten“) ----------
+  function raumOeffnen(zumHinzufuegen) {
+    const d = kd(); if (!d) return;
+    zeichneRaumDlg(); $('rdNeu').value = ''; $('rdErster').value = '';
+    $('raumDlg').showModal(); if (zumHinzufuegen || !d.raeume) (d.raeume ? $('rdNeu') : $('rdErster')).focus();
+  }
+  function zeichneRaumDlg() {
+    const d = kd(); if (!d) return;
+    $('rdKlasse').textContent = d.name;
+    const l = $('rdListe'); l.innerHTML = '';
+    if (!d.raeume) l.innerHTML = '<div class="leise">Diese Klasse hat bisher einen Sitzplan ohne Raumnamen. Gib ihm unten einen Namen und lege den zweiten Raum an.</div>';
+    for (const rid of raumListe(d)) {
+      const r = d.raeume[rid], z = document.createElement('div'); z.className = 'zeile raum-zeile';
+      const w = document.createElement('button'); w.className = 'raum-name' + (rid === d.raum ? ' an' : ''); w.textContent = r.name + (rid === d.raum ? ' (zu sehen)' : '');
+      w.title = rid === d.raum ? 'Dieser Sitzplan ist gerade zu sehen' : 'Zu diesem Raum wechseln';
+      w.addEventListener('click', () => { raumWechseln(d, rid); gewaehlt = null; $('raumDlg').close(); zeichne(); zeigeMeldung('Raum „' + r.name + '“'); });
+      const u = document.createElement('button'); u.textContent = 'umbenennen';
+      u.addEventListener('click', () => { const n = prompt('Neuer Name für den Raum „' + r.name + '“:', r.name); if (n && n.trim()) { r.name = n.trim(); zeichneRaumDlg(); zeichne(); } });
+      z.append(w, u);
+      if (raumListe(d).length > 1) {
+        const x = document.createElement('button'); x.className = 'gefahr'; x.textContent = 'löschen';
+        x.addEventListener('click', () => {
+          if (!confirm('Raum „' + r.name + '“ mit seinem Sitzplan löschen? Schüler, Bewertungen und Anwesenheit bleiben erhalten.')) return;
+          raumLoeschen(d, rid); zeichneRaumDlg(); zeichne();
+        });
+        z.append(x);
+      }
+      l.append(z);
+    }
+    $('rdErsterZeile').hidden = !!d.raeume;
+    // Vorschläge: Raumnamen aus allen Klassen, damit derselbe Raum überall gleich heißt
+    const namen = new Set(); for (const k of Object.values(st.klassen)) for (const r of Object.values(k.raeume || {})) namen.add(r.name);
+    $('raumNamen').innerHTML = ''; for (const n of [...namen].sort((a, b) => a.localeCompare(b, 'de'))) { const o = document.createElement('option'); o.value = n; $('raumNamen').append(o); }
+  }
+  const rdHinzu = () => {
+    const d = kd(); if (!d) return;
+    const vorher = raumName(d) || $('rdErster').value.trim() || 'Raum 1';
+    const name = $('rdNeu').value.trim() || 'Raum ' + (raumListe(d).length + (d.raeume ? 1 : 2));
+    const schonDa = d.raeume ? raumListe(d).map((rid) => d.raeume[rid].name) : [vorher];
+    if (schonDa.some((n) => n.toLowerCase() === name.toLowerCase())) { zeigeMeldung('Den Raum „' + name + '“ gibt es in dieser Klasse schon.'); $('rdNeu').focus(); return; }
+    raumHinzu(d, name, vorher); gewaehlt = null; $('raumDlg').close();
+    // gleich umstellen können (Wunsch: „… wenn man den dann verschiebt und umstellt …“)
+    const b = document.querySelector('.modus button[data-m="bearbeiten"]'); if (modus !== 'bearbeiten' && b) b.click(); else zeichne();
+    zeigeMeldung('Raum „' + name + '“ angelegt mit dem Sitzplan von „' + vorher + '“. Jetzt umstellen – das bleibt nur in „' + name + '“.');
+  };
+  $('raumKnopf').addEventListener('click', () => raumOeffnen(false));
+  $('raumPlus').addEventListener('click', () => raumOeffnen(true));
+  $('rdHinzu').addEventListener('click', rdHinzu);
+  $('rdNeu').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); rdHinzu(); } });
+  $('rdErster').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('rdNeu').focus(); } });
+
   $('schuelerAnlegen').addEventListener('click', () => {
     const d = kd(); const n = $('neuName').value.trim(); if (!d || !n) { $('neuName').focus(); return; }
     const s = { id: neueId('s'), name: n, mail: $('neuMail').value.trim() };
