@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.15';
+  const STAND = '2026-11-27.16';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -92,7 +92,8 @@
     for (const tg of Object.values((kd() && kd().anwesenheit) || {})) { const e = tg[id]; if (e && e.s === 'weg') weg++; if (e && e.s === 'spaet') spaet++; }
     return { weg, spaet };
   };
-  const ANW_FOLGE = { offen: 'da', da: 'weg', weg: 'spaet', spaet: 'da' };
+  // Antippen in „Anwesenheit“: ? → ✓ → ✕ → 🕘 → wieder ? (Wunsch 27.11.2026: „auch wieder auf undefiniert zurückstellen können“)
+  const ANW_FOLGE = { offen: 'da', da: 'weg', weg: 'spaet', spaet: null };
   const eintraege = (id, zeitraum) => {
     const l = (kd() && kd().protokoll[id]) || [];
     if (zeitraum === 'heute') return l.filter((e) => tag(e.zeit) === tag(Date.now()));
@@ -138,9 +139,16 @@
     else { b.style.background = farbe(s.name); b.textContent = kuerzel(s.name); }
     return b;
   }
+  // Name auf der Karte (Wunsch 27.11.2026): wahlweise nur der Vorname (st.nurVorname, Menü „Mehr …“). Doppelte Vornamen sind rot; bei ihnen
+  // lässt sich der Nachname einzeln zuschalten (s.mitNachname, Seitenspalte). Vor-/Nachname kommen aus Moodle, sonst gilt das erste Wort.
+  const vornameVon = (s) => s.vorname || String(s.name).trim().split(/\s+/)[0] || s.name;
+  const nachnameVon = (s) => s.nachname || String(s.name).trim().split(/\s+/).slice(1).join(' ');
+  const kartenName = (s) => (st.nurVorname ? (s.mitNachname ? (vornameVon(s) + ' ' + nachnameVon(s)).trim() : vornameVon(s)) : s.name);
+  const gleicheVornamen = (s) => schueler().filter((x) => x.id !== s.id && vornameVon(x).toLowerCase() === vornameVon(s).toLowerCase()).length;
+  const nameDoppelt = (s) => !!st.nurVorname && schueler().some((x) => x.id !== s.id && kartenName(x).toLowerCase() === kartenName(s).toLowerCase());
   function karte(s) {
     const k = document.createElement('div'); k.className = 'karte' + (s.id === gewaehlt ? ' gewaehlt' : ''); k.dataset.id = s.id; k.title = s.name;
-    const n = document.createElement('div'); n.className = 'name'; n.textContent = s.name;
+    const n = document.createElement('div'); n.className = 'name' + (nameDoppelt(s) ? ' doppelt' : ''); n.textContent = kartenName(s);
     const heute = eintraege(s.id, 'heute'), a = anwHeute(s.id);
     k.classList.add('anw-' + (a ? a.s : 'offen'));
     // Punkt = Anwesenheit (grau offen, grün da, orange später, rot fehlt); blauer Haken = heute bewertet (Wunsch 27.11.2026)
@@ -307,6 +315,13 @@
     const zu = document.createElement('button'); zu.className = 'zu'; zu.textContent = '✕'; zu.title = 'Schließen';
     zu.addEventListener('click', () => { gewaehlt = null; zeichne(); });
     kopf.append(b, h, g, zu); seite.append(kopf);
+    if (st.nurVorname && gleicheVornamen(s)) {
+      const l = document.createElement('label'); l.className = 'schalter nachname-zeigen' + (nameDoppelt(s) ? ' doppelt' : '');
+      const c = document.createElement('input'); c.type = 'checkbox'; c.checked = !!s.mitNachname;
+      c.addEventListener('change', () => { if (c.checked) s.mitNachname = true; else delete s.mitNachname; zeichne(); });
+      l.append(c, ' Den Vornamen „' + vornameVon(s) + '“ gibt es ' + (gleicheVornamen(s) + 1) + '× – Nachnamen auf der Karte zeigen');
+      seite.append(l);
+    }
 
     for (const k of st.kriterien) {
       const z = document.createElement('div'); z.className = 'kriterium';
@@ -489,7 +504,8 @@
     ({ import: importOeffnen, fotos: fotosOeffnen, klassen: klassenOeffnen, kriterien: kriterienOeffnen, sichern: sicherungSpeichern,
        laden: () => $('sicherungDatei').click(), beispiel: beispielAnlegen, moodleKlasse: mkOeffnen, shkKlasse: shkOeffnen })[a.dataset.aktion]();
   });
-  $('menueKnopf').addEventListener('click', () => $('menueDlg').showModal());
+  $('menueKnopf').addEventListener('click', () => { $('nurVorname').checked = !!st.nurVorname; $('menueDlg').showModal(); });
+  $('nurVorname').addEventListener('change', (e) => { if (e.target.checked) st.nurVorname = true; else delete st.nurVorname; zeichne(); });
 
   // ---------- Vollbild (Wunsch 27.11.2026) ----------
   // iPad-Safari kann Vollbild für die ganze Seite; der Knopf erscheint nur, wo der Browser es anbietet. Zweites Tippen beendet es.
@@ -522,7 +538,7 @@
       xb.addEventListener('click', () => {
         if (!confirm(s.name + ' mit allen Bewertungen und dem Foto aus dieser Klasse entfernen?')) return;
         d.schueler = d.schueler.filter((y) => y.id !== s.id); const p = platzVon(s.id); if (p) delete d.plaetze[p];
-        delete d.protokoll[s.id]; if (fotos.has(s.id)) moodleFoto(s.id, null); fotos.delete(s.id); DB.loesch('fotos', s.id).catch(() => {});
+        delete d.protokoll[s.id]; if (fotos.has(s.id)) { moodleFoto(s.id, null); originalMerken(s.id, null); } fotos.delete(s.id); DB.loesch('fotos', s.id).catch(() => {});
         if (gewaehlt === s.id) gewaehlt = null; zeichneKlassenDlg(); zeichne();
       });
       x.append(xb); tr.append(n, m, x); t.append(tr);
@@ -536,7 +552,7 @@
   $('klasseLoeschen').addEventListener('click', () => {
     const d = kd(); if (!d) return;
     if (!confirm('Klasse „' + d.name + '“ mit ' + d.schueler.length + ' Schülern, allen Bewertungen und Fotos löschen? Das lässt sich nicht rückgängig machen.')) return;
-    for (const s of d.schueler) { if (fotos.has(s.id)) moodleFoto(s.id, null); fotos.delete(s.id); DB.loesch('fotos', s.id).catch(() => {}); }
+    for (const s of d.schueler) { if (fotos.has(s.id)) { moodleFoto(s.id, null); originalMerken(s.id, null); } fotos.delete(s.id); DB.loesch('fotos', s.id).catch(() => {}); }
     delete st.klassen[st.klasse]; st.klasse = klassenSortiert()[0] || null; gewaehlt = null; zeichneKlassenDlg(); zeichne();
   });
   $('schuelerAnlegen').addEventListener('click', () => {
@@ -728,10 +744,45 @@
 
   // ---------- Foto aufnehmen, zuschneiden, speichern ----------
   const C = 600;
-  const foto = { s: null, img: null, url: null, zoom: 1, ox: 0, oy: 0 };
+  const foto = { s: null, img: null, url: null, zoom: 1, ox: 0, oy: 0, origNeu: false };
+  // Originale (höchstens 800 px) und die Zuschnitt-Einstellung s.zuschnitt = { zoom, ox, oy } merken, damit ein gespeichertes Foto später
+  // neu verschoben und gezoomt werden kann (Wunsch 27.11.2026). Ablage: Gerät „fotos“ › Schlüssel „o:<id>“ (in Moodle nur bis zum Senden),
+  // Moodle „Meine Dateien“ › klassen-app/fotos/original/<id>.jpg. Fotos von vorher haben kein Original: dann dient der Ausschnitt als Original.
+  function originalVon(img) {
+    const k = Math.min(1, 800 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(img.naturalWidth * k)); c.height = Math.max(1, Math.round(img.naturalHeight * k));
+    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.85);
+  }
+  async function originalLaden(id) {
+    try { const d = await DB.lies('fotos', 'o:' + id); if (d) return d; } catch (e) { /* weiter in Moodle */ }
+    if (IN_MOODLE) {
+      const u = MO.adresse(ORIG_ORDNER, id + '.jpg') + '?v=' + MO.rev;
+      try { const r = await fetch(u, { credentials: 'same-origin' }); if (r.ok) return u; } catch (e) { /* kein Original */ }
+    }
+    return null;
+  }
+  function originalMerken(id, daten) { // daten = data-URL, null = löschen
+    if (daten) DB.schreib('fotos', 'o:' + id, daten).catch(() => {}); else DB.loesch('fotos', 'o:' + id).catch(() => {});
+    if (IN_MOODLE) { MO.origAuftraege.set(id, daten); moodleMerken(true); }
+  }
   function fotoOeffnen(s) {
-    foto.s = s; foto.img = null; $('fotoName').textContent = s.name; $('zuschnitt').hidden = true;
+    foto.s = s; foto.img = null; foto.origNeu = false; $('fotoName').textContent = s.name; $('zuschnitt').hidden = true;
     $('fotoSpeichern').disabled = true; $('fotoLoeschen').hidden = !fotos.has(s.id); $('fotoDlg').showModal();
+    if (fotos.has(s.id)) fotoBearbeiten(s);
+  }
+  // Vorhandenes Foto zum Verschieben/Zoomen öffnen: Original mit gemerkter Einstellung, sonst den gespeicherten Ausschnitt.
+  async function fotoBearbeiten(s) {
+    const orig = await originalLaden(s.id);
+    const quelle = orig || fotos.get(s.id); if (!quelle || foto.s !== s) return;
+    const z = (orig && s.zuschnitt) || { zoom: 1, ox: 0, oy: 0 };
+    const img = new Image();
+    img.onload = () => {
+      if (foto.s !== s || foto.img) return; // inzwischen ein neues Bild gewählt
+      foto.img = img; foto.origNeu = !orig; foto.zoom = z.zoom; foto.ox = z.ox; foto.oy = z.oy; $('fotoZoom').value = z.zoom;
+      fotoBegrenzen(); $('zuschnitt').hidden = false; $('fotoSpeichern').disabled = false; fotoZeichnen();
+    };
+    img.src = quelle;
   }
   $('fotoKameraKnopf').addEventListener('click', () => $('fotoKamera').click());
   $('fotoDateiKnopf').addEventListener('click', () => $('fotoDatei').click());
@@ -741,7 +792,7 @@
     if (foto.url) URL.revokeObjectURL(foto.url);
     foto.url = URL.createObjectURL(datei);
     const img = new Image();
-    img.onload = () => { foto.img = img; foto.zoom = 1; foto.ox = 0; foto.oy = 0; $('fotoZoom').value = 1; $('zuschnitt').hidden = false; $('fotoSpeichern').disabled = false; fotoZeichnen(); };
+    img.onload = () => { foto.img = img; foto.origNeu = true; foto.zoom = 1; foto.ox = 0; foto.oy = 0; $('fotoZoom').value = 1; $('zuschnitt').hidden = false; $('fotoSpeichern').disabled = false; fotoZeichnen(); };
     img.onerror = () => alert('Dieses Bild lässt sich nicht öffnen.');
     img.src = foto.url;
   }
@@ -768,11 +819,14 @@
     const out = document.createElement('canvas'); out.width = out.height = 320; fotoMalen(out.getContext('2d'), 320);
     const daten = out.toDataURL('image/jpeg', 0.85);
     try { await DB.schreib('fotos', foto.s.id, daten); } catch (e) { alert('Das Foto ließ sich nicht speichern: ' + (e && e.message || e)); return; }
+    if (foto.origNeu) originalMerken(foto.s.id, originalVon(foto.img));
+    foto.s.zuschnitt = { zoom: foto.zoom, ox: Math.round(foto.ox * 10) / 10, oy: Math.round(foto.oy * 10) / 10 };
     fotos.set(foto.s.id, daten); moodleFoto(foto.s.id, daten); $('fotoDlg').close(); zeichne();
   });
   $('fotoLoeschen').addEventListener('click', async () => {
     if (!foto.s || !confirm('Foto von ' + foto.s.name + ' entfernen?')) return;
-    await DB.loesch('fotos', foto.s.id).catch(() => {}); fotos.delete(foto.s.id); moodleFoto(foto.s.id, null); $('fotoDlg').close(); zeichne();
+    await DB.loesch('fotos', foto.s.id).catch(() => {}); fotos.delete(foto.s.id); moodleFoto(foto.s.id, null);
+    originalMerken(foto.s.id, null); delete foto.s.zuschnitt; $('fotoDlg').close(); zeichne();
   });
   $('fotoDlg').addEventListener('close', () => { if (foto.url) { URL.revokeObjectURL(foto.url); foto.url = null; } foto.img = null; $('fotoCanvas').getContext('2d').clearRect(0, 0, C, C); });
 
@@ -873,10 +927,15 @@
     const ersetzt = bereit.filter((f) => fotos.has(f.sid)).length;
     if (ersetzt && !confirm((ersetzt === 1 ? 'Ein Schüler hat' : ersetzt + ' Schüler haben') + ' schon ein Foto. Ersetzen?')) return;
     let n = 0;
+    const d = kd();
     for (const f of bereit) {
       const daten = quadratBild(f.img);
       try { await DB.schreib('fotos', f.sid, daten); } catch (e) { alert('Ein Foto ließ sich nicht speichern: ' + (e && e.message || e)); break; }
       fotos.set(f.sid, daten); moodleFoto(f.sid, daten); n++;
+      // Original + derselbe Ausschnitt wie quadratBild (mittig, Hochformat 30 % von oben) als Einstellung → später nachbessern
+      originalMerken(f.sid, originalVon(f.img));
+      const w = f.img.naturalWidth, h = f.img.naturalHeight, sk = Math.min(w, h), s = d && d.schueler.find((x) => x.id === f.sid);
+      if (s) s.zuschnitt = { zoom: 1, ox: 0, oy: h > w ? Math.round((h - sk) * 0.2 * (C / sk) * 10) / 10 : 0 };
     }
     $('fotosDlg').close(); zeichne();
     zeigeMeldung(n + (n === 1 ? ' Foto' : ' Fotos') + ' übernommen. Den Ausschnitt kannst du über das Foto des Schülers nachbessern.');
@@ -886,7 +945,9 @@
   // ---------- Sicherung ----------
   async function sicherungSpeichern() {
     const jetzt = Date.now();
-    const daten = JSON.stringify({ app: 'klassen-app', art: 'sicherung', stand: STAND, erstellt: new Date(jetzt).toISOString(), zustand: Object.assign({}, st, { letzteSicherung: jetzt }), fotos: Object.fromEntries(fotos) });
+    const alleFotos = Object.fromEntries(fotos); // samt Originalen „o:<id>“, damit nach dem Laden noch nachgebessert werden kann
+    try { for (const [k, v] of await DB.alle('fotos')) if (k.startsWith('o:')) alleFotos[k] = v; } catch (e) { /* ohne Originale */ }
+    const daten = JSON.stringify({ app: 'klassen-app', art: 'sicherung', stand: STAND, erstellt: new Date(jetzt).toISOString(), zustand: Object.assign({}, st, { letzteSicherung: jetzt }), fotos: alleFotos });
     const name = 'klassen-app-sicherung-' + new Date(jetzt).toISOString().slice(0, 16).replace(/[T:]/g, '-') + '.json';
     const erg = await dateiAbgeben(name, daten, 'application/json');
     if (erg !== 'abgebrochen') { st.letzteSicherung = jetzt; zeichne(); zeigeMeldung('Sicherung erstellt: ' + name + ' – bitte in „Dateien“ ablegen und ab und zu auf den PC kopieren.'); }
@@ -900,7 +961,7 @@
     st = Object.assign(grund(), s.zustand);
     try {
       await DB.leeren('fotos'); fotos.clear();
-      for (const [k, v] of Object.entries(s.fotos || {})) { await DB.schreib('fotos', k, v); fotos.set(k, v); }
+      for (const [k, v] of Object.entries(s.fotos || {})) { await DB.schreib('fotos', k, v); if (!k.startsWith('o:')) fotos.set(k, v); }
     } catch (e) { alert('Beim Laden der Fotos gab es einen Fehler: ' + (e && e.message || e)); }
     if (!st.klassen[st.klasse]) st.klasse = klassenSortiert()[0] || null;
     gewaehlt = null; zeichne(); zeigeMeldung('Sicherung geladen.');
@@ -920,8 +981,8 @@
   // Liegt die App als Datei in einem Moodle-Kurs, arbeitet sie mit der Anmeldung des Lehrers (kein Schlüssel nötig):
   // Daten und Fotos in „Meine Dateien“ › klassen-app/ (nur für ihn sichtbar), Klassen aus Moodle-Kursen, Noten direkt in einen
   // Bewertungsaspekt. Auf dem Gerät bleibt nur, was noch nicht gesendet ist. Die Wege sind am 27.11.2026 erprobt (03-Moodle.md).
-  const MO = { sk: '', ctx: '', repo: '4', rev: 0, zuletzt: null, bereit: false, laeuft: false, nochmal: false, timer: null, fotoAuftraege: new Map(), kurse: null };
-  const ORDNER = '/klassen-app/', FOTO_ORDNER = '/klassen-app/fotos/';
+  const MO = { sk: '', ctx: '', repo: '4', rev: 0, zuletzt: null, bereit: false, laeuft: false, nochmal: false, timer: null, fotoAuftraege: new Map(), origAuftraege: new Map(), kurse: null };
+  const ORDNER = '/klassen-app/', FOTO_ORDNER = '/klassen-app/fotos/', ORIG_ORDNER = '/klassen-app/fotos/original/';
   MO.ajax = async (methodname, args, nochmal = true) => {
     try { return await MO.ajax1(methodname, args); } catch (e) {
       // Nach einem neuen Bewertungsaspekt rechnet Moodle die Noten erst neu, wenn die Bewertungsübersicht geöffnet wird.
@@ -998,7 +1059,7 @@
   }
   function moodleMerken(sofort) {
     if (!IN_MOODLE || !MO.bereit) return;
-    if (!sofort && JSON.stringify(st) === MO.zuletzt && !MO.fotoAuftraege.size) return;
+    if (!sofort && JSON.stringify(st) === MO.zuletzt && !MO.fotoAuftraege.size && !MO.origAuftraege.size) return;
     DB.schreib('kv', 'ausstehend', st).catch(() => {});
     clearTimeout(MO.timer); MO.timer = setTimeout(moodleSpeichern, 2500);
     speicherStand('Daten in Moodle · wird gleich gespeichert …');
@@ -1010,6 +1071,7 @@
   async function moodleSpeichern() {
     if (MO.laeuft) { MO.nochmal = true; return; }
     MO.laeuft = true; clearTimeout(MO.timer); MO.timer = null; speicherStand('Daten in Moodle · speichert …');
+    let fremdGeladen = false; // „Abbrechen“ beim Konflikt: nichts gesendet, Stand des anderen Geräts geladen (27.11.2026: stand sonst „gespeichert“)
     try {
       do {
         MO.nochmal = false;
@@ -1017,16 +1079,18 @@
         if (fern && fern.rev !== MO.rev) {
           const wann = new Date(fern.rev).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
           if (!confirm('Auf einem anderen Gerät wurde am ' + wann + ' gespeichert.\n\nOK: den Stand von diesem Gerät speichern (der andere wird überschrieben).\nAbbrechen: den anderen Stand laden (die Änderungen hier gehen verloren).')) {
-            st = Object.assign(grund(), fern.zustand); MO.rev = fern.rev; MO.zuletzt = JSON.stringify(st); MO.fotoAuftraege.clear(); fotos.clear();
+            st = Object.assign(grund(), fern.zustand); MO.rev = fern.rev; MO.zuletzt = JSON.stringify(st); MO.fotoAuftraege.clear(); MO.origAuftraege.clear(); fotos.clear();
             await DB.loesch('kv', 'ausstehend').catch(() => {}); await DB.leeren('fotos').catch(() => {});
             await moodleFotosLaden(); if (!st.klassen[st.klasse]) st.klasse = klassenSortiert()[0] || null; gewaehlt = null; zeichne();
-            break;
+            fremdGeladen = true; break;
           }
         }
         const rev = Math.max(Date.now(), (fern ? fern.rev : 0) + 1), jetzt = JSON.stringify(st);
         const auftraege = [{ pfad: ORDNER, name: 'daten.json', blob: new Blob([JSON.stringify({ app: 'klassen-app', stand: STAND, rev, zustand: st })], { type: 'application/json' }) }];
         const fotosJetzt = new Map(MO.fotoAuftraege);
         for (const [id, url] of fotosJetzt) auftraege.push({ pfad: FOTO_ORDNER, name: id + '.jpg', blob: url ? await (await fetch(url)).blob() : null });
+        const origJetzt = new Map(MO.origAuftraege);
+        for (const [id, url] of origJetzt) auftraege.push({ pfad: ORIG_ORDNER, name: id + '.jpg', blob: url ? await (await fetch(url)).blob() : null });
         await MO.schreibe(auftraege);
         MO.rev = rev; MO.zuletzt = jetzt;
         for (const [id, url] of fotosJetzt) {
@@ -1034,10 +1098,11 @@
           MO.fotoAuftraege.delete(id); DB.loesch('fotos', id).catch(() => {});
           if (url) fotos.set(id, MO.adresse(FOTO_ORDNER, id + '.jpg') + '?v=' + rev);
         }
+        for (const [id, url] of origJetzt) { if (MO.origAuftraege.get(id) === url) { MO.origAuftraege.delete(id); DB.loesch('fotos', 'o:' + id).catch(() => {}); } }
         if (JSON.stringify(st) === MO.zuletzt) await DB.loesch('kv', 'ausstehend').catch(() => {});
-        if (JSON.stringify(st) !== MO.zuletzt || MO.fotoAuftraege.size) MO.nochmal = true;
+        if (JSON.stringify(st) !== MO.zuletzt || MO.fotoAuftraege.size || MO.origAuftraege.size) MO.nochmal = true;
       } while (MO.nochmal);
-      speicherStand('Daten in Moodle · gespeichert ' + uhrzeit());
+      speicherStand(fremdGeladen ? 'Daten in Moodle · Stand vom anderen Gerät geladen ' + uhrzeit() : 'Daten in Moodle · gespeichert ' + uhrzeit());
     } catch (e) {
       const grund_ = e && e.message === 'anmelden' ? 'nicht bei Moodle angemeldet' : navigator.onLine === false ? 'offline' : (e && e.message) || 'Fehler';
       speicherStand('⚠ Daten noch nicht in Moodle gespeichert (' + grund_ + ') – neuer Versuch in 30 s');
@@ -1051,7 +1116,10 @@
   async function moodleStart() {
     document.body.classList.add('moodle'); speicherStand('Daten in Moodle · verbinde …');
     let lokal = null, fern = null, fehler = null;
-    try { lokal = await DB.lies('kv', 'ausstehend'); for (const [k, v] of await DB.alle('fotos')) { fotos.set(k, v); MO.fotoAuftraege.set(k, v); } } catch (e) { /* kein Zwischenspeicher */ }
+    try {
+      lokal = await DB.lies('kv', 'ausstehend');
+      for (const [k, v] of await DB.alle('fotos')) { if (k.startsWith('o:')) MO.origAuftraege.set(k.slice(2), v); else { fotos.set(k, v); MO.fotoAuftraege.set(k, v); } }
+    } catch (e) { /* kein Zwischenspeicher */ }
     try { await MO.formular(); fern = await moodleDatenLesen(); if (fern) MO.rev = fern.rev; await moodleFotosLaden(); } catch (e) { fehler = e; }
     if (fern) st = Object.assign(grund(), fern.zustand);
     MO.zuletzt = JSON.stringify(st);
@@ -1062,8 +1130,8 @@
       if (fehler.message === 'anmelden') moodleAnmeldeHinweis();
       else banner('Moodle ist gerade nicht erreichbar (' + fehler.message + '). Du arbeitest mit dem Stand auf diesem Gerät; gespeichert wird, sobald Moodle wieder erreichbar ist.');
       speicherStand('⚠ Daten noch nicht mit Moodle abgeglichen');
-      if ((lokal && lokal.klassen) || MO.fotoAuftraege.size) MO.timer = setTimeout(moodleSpeichern, 30000);
-    } else if ((lokal && lokal.klassen) || MO.fotoAuftraege.size) moodleMerken(true);
+      if ((lokal && lokal.klassen) || MO.fotoAuftraege.size || MO.origAuftraege.size) MO.timer = setTimeout(moodleSpeichern, 30000);
+    } else if ((lokal && lokal.klassen) || MO.fotoAuftraege.size || MO.origAuftraege.size) moodleMerken(true);
     else speicherStand(fern ? 'Daten in Moodle · geladen ' + uhrzeit() : 'Daten in Moodle · noch nichts gespeichert');
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && MO.timer) moodleSpeichern(); });
   }
@@ -1121,7 +1189,7 @@
   $('mkGruppe').addEventListener('change', () => mkLaden().catch((e) => { $('mkVorschau').textContent = moodleFehler(e); }));
   $('mkZiel').addEventListener('change', () => { $('mkNeuName').hidden = !!$('mkZiel').value; });
   const mkNutzer = (d) => (d.users || []).map((u) => ({ mid: u.id, name: ((u.firstname || '') + ' ' + (u.lastname || '')).trim() || u.fullname, mail: u.email || '',
-    bild: /\/user\/icon\//.test(u.profileimageurl || '') ? u.profileimageurl : '' }));
+    vorname: (u.firstname || '').trim(), nachname: (u.lastname || '').trim(), bild: /\/user\/icon\//.test(u.profileimageurl || '') ? u.profileimageurl : '' }));
   // „1BFSHK1 (2026/27) Globale Gruppe“ → „1BFSHK1“
   const kurzName = (n) => n.replace(/\s*Globale Gruppe\s*$/i, '').replace(/\s*\(\d{4}\/\d{2}\)\s*$/, '').trim() || n;
   // Schüler aus Moodle in Klasse d übernehmen: Vorhandene (gleiche Moodle-Nummer oder E-Mail) werden aktualisiert, Bewertungen bleiben.
@@ -1131,6 +1199,7 @@
       let s = d.schueler.find((x) => x.mid === u.mid || (u.mail && x.mail && x.mail.toLowerCase() === u.mail.toLowerCase()));
       if (s) { s.mid = u.mid; s.name = u.name; if (u.mail) s.mail = u.mail; s.profilbild = u.bild; schonDa++; }
       else { s = { id: 'm' + u.mid, name: u.name, mail: u.mail, mid: u.mid, profilbild: u.bild }; d.schueler.push(s); neu.push(s.id); }
+      if (u.vorname) { s.vorname = u.vorname; s.nachname = u.nachname; }
     }
     freiSetzen(d, neu);
     return { neu: neu.length, schonDa };
@@ -1255,7 +1324,7 @@
     try {
       const z = await DB.lies('kv', 'zustand');
       if (z && z.klassen) st = Object.assign(grund(), z);
-      for (const [k, v] of await DB.alle('fotos')) fotos.set(k, v);
+      for (const [k, v] of await DB.alle('fotos')) if (!k.startsWith('o:')) fotos.set(k, v); // Originale „o:<id>“ lädt erst das Foto-Fenster
     } catch (e) {
       banner('Auf diesem Gerät kann die App nichts speichern (privates Surfen?). Bewertungen gehen beim Schließen verloren.');
     }
