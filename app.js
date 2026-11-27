@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-27.20';
+  const STAND = '2026-11-27.21';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -186,10 +186,26 @@
   // den Haken, zeigen alle Gleichnamigen den Nachnamen (rot). Vor-/Nachname kommen aus Moodle, sonst gilt das erste Wort.
   const vornameVon = (s) => s.vorname || String(s.name).trim().split(/\s+/)[0] || s.name;
   const nachnameVon = (s) => s.nachname || String(s.name).trim().split(/\s+/).slice(1).join(' ');
-  const mitNN = (s) => !!s.mitNachname || schueler().some((x) => x.mitNachname && vornameVon(x).toLowerCase() === vornameVon(s).toLowerCase());
+  // Gleich gesprochene Namen gelten als doppelt (Wunsch 27.11.2026: „Namen, die gleich ausgesprochen werden, auch als doppelt, wie z.B. Eric und
+  // Erik“). Einfache Klangform für deutsche Schreibweisen: Umlaute/Akzente, chr/kr, ck/k, ph/f, th/t, qu/kw, x/ks, c vor e/i/y = z, sonst k,
+  // dt/t, tz/ts = z, v/w, y/j/i, stummes h nach Selbstlaut, Doppelbuchstaben, d am Ende = t, ie am Ende = i. Beispiele: Eric = Erik = Erick,
+  // Jannik = Yannick, Maja = Maya, Philipp = Filip, Lukas = Lucas, Sarah = Sara, Stephan = Stefan, Mehmed = Mehmet, Marvin = Marwin.
+  const klangSpeicher = new Map();
+  function klang(n) {
+    const roh = String(n || '');
+    if (klangSpeicher.has(roh)) return klangSpeicher.get(roh);
+    let t = roh.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+      .normalize('NFD').replace(/\p{M}/gu, '').replace(/[^a-z]/g, '');
+    t = t.replace(/^chr/, 'kr').replace(/ck/g, 'k').replace(/ch/g, 'C').replace(/ph/g, 'f').replace(/th/g, 't').replace(/qu/g, 'kw')
+      .replace(/x/g, 'ks').replace(/c(?=[eiy])/g, 'z').replace(/c/g, 'k').replace(/dt/g, 't').replace(/t[zs]/g, 'z').replace(/v/g, 'w')
+      .replace(/[yj]/g, 'i').replace(/([aeiou])h/g, '$1').replace(/(.)\1+/g, '$1').replace(/d$/, 't').replace(/ie$/, 'i');
+    const k = t || roh.toLowerCase(); klangSpeicher.set(roh, k); return k;
+  }
+  const gleicherVorname = (a, b) => klang(vornameVon(a)) === klang(vornameVon(b));
+  const mitNN = (s) => !!s.mitNachname || schueler().some((x) => x.mitNachname && gleicherVorname(x, s));
   const kartenName = (s) => (st.nurVorname ? (mitNN(s) ? (vornameVon(s) + ' ' + nachnameVon(s)).trim() : vornameVon(s)) : s.name);
-  const gleicheVornamen = (s) => schueler().filter((x) => x.id !== s.id && vornameVon(x).toLowerCase() === vornameVon(s).toLowerCase()).length;
-  const nameDoppelt = (s) => !!st.nurVorname && schueler().some((x) => x.id !== s.id && kartenName(x).toLowerCase() === kartenName(s).toLowerCase());
+  const gleicheVornamen = (s) => schueler().filter((x) => x.id !== s.id && gleicherVorname(x, s)).length;
+  const nameDoppelt = (s) => !!st.nurVorname && schueler().some((x) => x.id !== s.id && klang(kartenName(x)) === klang(kartenName(s)));
   function karte(s) {
     const k = document.createElement('div'); k.className = 'karte' + (s.id === gewaehlt ? ' gewaehlt' : ''); k.dataset.id = s.id; k.title = s.name;
     const n = document.createElement('div'); n.className = 'name' + (nameDoppelt(s) ? ' doppelt' : '');
@@ -371,9 +387,11 @@
       const l = document.createElement('label'); l.className = 'schalter nachname-zeigen' + (nameDoppelt(s) ? ' doppelt' : '');
       const c = document.createElement('input'); c.type = 'checkbox'; c.checked = mitNN(s);
       // gilt für alle mit diesem Vornamen (Wunsch 27.11.2026: „erscheint nur bei einem der doppelten Namen“)
-      const gleich = (x) => vornameVon(x).toLowerCase() === vornameVon(s).toLowerCase();
+      const gleich = (x) => gleicherVorname(x, s);
       c.addEventListener('change', () => { for (const x of schueler()) if (gleich(x)) { if (c.checked) x.mitNachname = true; else delete x.mitNachname; } zeichne(); });
-      l.append(c, ' Den Vornamen „' + vornameVon(s) + '“ gibt es ' + (gleicheVornamen(s) + 1) + '× – bei allen den Nachnamen auf der Karte zeigen (rot)');
+      // Schreibweisen nennen, wenn sie sich unterscheiden (Eric, Erik): „klingen gleich“
+      const formen = [...new Set(schueler().filter(gleich).map((x) => vornameVon(x)))];
+      l.append(c, (formen.length > 1 ? ' „' + formen.join('“ und „') + '“ klingen gleich (' : ' Den Vornamen „' + vornameVon(s) + '“ gibt es ') + (gleicheVornamen(s) + 1) + '×' + (formen.length > 1 ? ')' : '') + ' – bei allen den Nachnamen auf der Karte zeigen (rot)');
       seite.append(l);
     }
 
