@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-28.32';
+  const STAND = '2026-11-28.33';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -505,7 +505,9 @@
   let passSchluessel = '';
   // Grundformat für alle Anzeigen seit Stand .32 (Wunsch 28.11.2026 ~09:20, Skizze des Lehrers: Foto 175 × 211, Namensstreifen 28 darunter): Foto 5 : 6 (Breite : Höhe),
   // darunter der Namensstreifen mit 16 % der Breite – der Tisch ist 25 : 34; je nach Bildschirm größer oder kleiner. Davor: .31 4 : 5 mit dem Namen auf dem Foto, .30 quadratisch.
-  const FOTO_FORMAT = 5 / 6, STREIFEN = 0.16, TISCH_FORMAT = 1 / (1 / FOTO_FORMAT + STREIFEN), TISCH_MAX = 176; // Breite/Höhe; größte Tischhöhe in px (≈ 129 px breit)
+  // Seit Stand .33 (Wunsch 28.11.2026 ~13:10: „Es soll immer der volle Bereich dann dargestellt sein …“) wachsen die Tische bis an Breite UND Höhe des Raums;
+  // TISCH_MAX ist nur noch eine Notbremse für sehr kleine Klassen (vorher 176 px – im Vollbild blieb unter der Tafel ein großer leerer Bereich).
+  const FOTO_FORMAT = 5 / 6, STREIFEN = 0.16, TISCH_FORMAT = 1 / (1 / FOTO_FORMAT + STREIFEN), TISCH_MAX = 400; // Breite/Höhe; größte Tischhöhe in px (≈ 294 px breit)
   function einpassen() { tischGroesse(); namenEinpassen(); }
   // Zu lange Namen werden im Streifen kleiner (bis auf drei Viertel, nie unter 8 px), erst dann „…“. Läuft nach jedem Zeichnen und jeder Größenänderung: erst alle
   // zurücksetzen, dann alle messen, dann alle setzen (sonst rechnet der Browser bei jeder Karte das ganze Layout neu).
@@ -535,14 +537,19 @@
     p.setProperty('--platz-h', h + 'px');
     const imRaum = (y) => y - raum.getBoundingClientRect().top + raum.scrollTop;
     const nutzbar = () => raum.clientHeight - parseFloat(getComputedStyle(raum).paddingBottom);
-    const passt = () => imRaum(tafel.getBoundingClientRect().bottom) <= nutzbar() + 0.5;
-    if (passt()) return;
-    document.body.classList.add('eng');
     const reihen = Math.max(1, plaetzeEl.querySelectorAll('.reihe').length);
-    const tafelH = tafel.getBoundingClientRect().height + parseFloat(getComputedStyle(tafel).marginTop);
-    const gaenge = [...plaetzeEl.querySelectorAll('.reihen-gang')].reduce((s, e) => s + e.getBoundingClientRect().height, 0);
-    const proReihe = Math.floor((nutzbar() - imRaum(plaetzeEl.getBoundingClientRect().top) - tafelH - gaenge) / reihen);
-    h = Math.max(56, Math.min(h, proReihe)); p.setProperty('--platz-h', h + 'px');
+    // Höhe je Reihe, die der Raum hergibt: vom oberen Rand des Sitzplans bis über die Tafel. Zum Messen steht der Sitzplan direkt unter der Leiste
+    // (sonst schiebt margin-top: auto aus app.css ihn schon nach unten und die Rechnung ginge von dort aus).
+    const proReihe = () => {
+      const tafelH = tafel.getBoundingClientRect().height + parseFloat(getComputedStyle(tafel).marginTop);
+      const gaenge = [...plaetzeEl.querySelectorAll('.reihen-gang')].reduce((s, e) => s + e.getBoundingClientRect().height, 0);
+      return Math.floor((nutzbar() - imRaum(plaetzeEl.getBoundingClientRect().top) - tafelH - gaenge) / reihen);
+    };
+    plaetzeEl.style.marginTop = '0px';
+    let hoehe = proReihe();
+    if (hoehe < h) { document.body.classList.add('eng'); hoehe = proReihe(); } // passt nicht in die Höhe: erst enger zusammenrücken, dann kleiner
+    h = Math.max(56, Math.min(h, hoehe)); p.setProperty('--platz-h', h + 'px');
+    plaetzeEl.style.marginTop = '';
   }
   if (typeof ResizeObserver === 'function') new ResizeObserver(() => einpassen()).observe($('raum'));
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => namenEinpassen()); // Schrift geladen: Namen neu messen

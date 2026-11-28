@@ -53,8 +53,15 @@ body.bearbeiten .nur-bearbeiten { display: inline-flex !important; gap: 8px; ali
 body.bearbeiten .ablage-box.nur-bearbeiten { display: block !important; }
 
 .haupt-bereich { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: 0; }
-.raum { padding: 14px; overflow: auto; }
-.tafel { background: var(--tafel); color: #e8f1ea; text-align: center; border-radius: 8px; padding: 6px; font-size: 12px; letter-spacing: .05em; margin: 14px auto 0; max-width: 520px; }
+/* Seit Stand .33 (Wunsch 28.11.2026 ~13:10: „… für die Zeile, Tafel, leerer Pult, etwas weniger Platz nehmen. Gerade wenn ich auf Vollbild an sich gehe, ist
+   unterhalb der Tafel noch ein großer … Bereich. Es soll immer der volle Bereich dann dargestellt sein, dann könnte das auch mit dem Plan besser passen.“):
+   Tafel-Leiste schmal; die Tische werden so groß, wie Breite UND Höhe erlauben (einpassen() in app.js); bleibt in der Höhe etwas übrig, steht der Sitzplan
+   samt Tafel unten am Rand (margin-top: auto) – unter der Tafel bleibt kein leerer Bereich. */
+.raum { padding: 14px 14px 6px; overflow: auto; display: flex; flex-direction: column; }
+#sitzplan { flex: 1 0 auto; display: flex; flex-direction: column; }
+#sitzplan > .plaetze { margin-top: auto; }
+.tafel { background: var(--tafel); color: #e8f1ea; text-align: center; border-radius: 6px; padding: 2px 6px; font-size: 11px; line-height: 18px; letter-spacing: .05em;
+  margin: 4px auto 0; width: 100%; max-width: 520px; flex: none; }
 /* Durchgang nur angedeutet; ohne Durchgang stehen die Tische aneinander – seit Stand .25 auch zwischen den Reihen (Wunsch 27.11.2026 ~14:35: „Damit wir
    vertikal auch Platz sparen, nehmen dann die Abstände auch zwischen vertikalen Bildern heraus. Nur wenn Gänge eingefügt werden, dann soll ein Abstand sein
    … Durch den Namensstreifen haben wir dann eine Art Flur oder Abstand zwischen den Bildern.“; davor 8 px) */
@@ -76,8 +83,8 @@ body.bearbeiten.eng .plaetze { --platz-rand: 14px; }
 .platz .karte { width: 100%; max-width: none; height: auto; align-self: stretch; }
 /* Passt der Sitzplan nicht in die Höhe (iPad quer, Notebook), rückt alles enger zusammen; die Bildgröße setzt einpassen() in app.js
    (iPad-Test 27.11.2026: vorderste Reihe und Tafel lagen unter dem Bildschirmrand). */
-body.eng .raum { padding-top: 10px; padding-bottom: 10px; }
-body.eng .tafel { margin-top: 8px; padding: 4px; }
+body.eng .raum { padding-top: 10px; padding-bottom: 4px; }
+body.eng .tafel { margin-top: 3px; padding: 1px 6px; }
 body.eng .platz { padding: 3px; }
 .anw-kurz { display: none; }
 body.eng #sitzplan .anw-kurz { display: inline; }
@@ -186,8 +193,12 @@ body.bearbeiten .karte { cursor: grab; }
    etwas höher – dort fällt mehr unten weg (unter dem Kopf lag dort der Namensstreifen). */
 .karte .bild img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 25%; }
 .platz .karte .bild { font-size: min(21cqw, calc(var(--platz-h, 120px) * .3)); }
+/* Seit Stand .33 (Wunsch 28.11.2026 ~13:10: „das namensschild verdeckt auch noch ein Teil vom Bild. Das sollte nicht so sein.“): Auf dem Tisch hängt die
+   Fotohöhe nicht mehr an aspect-ratio im Flex-Layout (je nach Browser verschieden), sondern wird aus der Tischhöhe gerechnet: Innenhöhe der Karte
+   (--platz-h minus --platz-rand) × 30/34 = Fotobreite × 6/5; der Streifen bekommt den Rest (4/34) und liegt immer UNTER dem Foto. */
+.platz .karte .bild { height: calc((var(--platz-h, 120px) - var(--platz-rand, 4px)) * 30 / 34); aspect-ratio: auto; flex: none; }
 .karte .name { flex: 1 0 0; height: 0; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 4px; overflow: hidden;
-  border-radius: 0 0 10px 10px; background: #fff; color: #1d2330; font-weight: 600; font-size: clamp(9px, 11.5cqw, 17px); line-height: 1.1; }
+  border-radius: 0 0 10px 10px; background: #fff; color: #1d2330; font-weight: 600; font-size: clamp(9px, 11.5cqw, 22px); line-height: 1.1; }
 .karte .name-text { min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kopf .bild { width: 60px; height: 72px; border-radius: 10px; } /* Seitenspalte: dasselbe Format 5 : 6 */
 .karte .name.doppelt, .karte .name .nn { color: #c93c37; font-weight: 700; } /* fest, auch im dunklen Erscheinungsbild: der Streifen bleibt weiß */
@@ -291,7 +302,7 @@ body:not(.bearbeiten) .platz { padding: 0; border-width: 0; } /* seit Stand .25 
 /* Räume (Wunsch 27.11.2026): Knopf links in der Tafel-Leiste; Dialog mit den Räumen der Klasse */
 .tafel { position: relative; }
 .tafel .raum-knopf { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); max-width: 32%; overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap; font-size: 12px; line-height: 1.2; padding: 3px 9px; min-height: 0; letter-spacing: 0; color: inherit;
+  white-space: nowrap; font-size: 11px; line-height: 14px; padding: 1px 8px; min-height: 0; letter-spacing: 0; color: inherit;
   background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.5); border-radius: 6px; }
 .raum-liste { display: grid; gap: 6px; }
 .raum-zeile { align-items: center; }
