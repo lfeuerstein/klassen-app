@@ -62,18 +62,23 @@ body.bearbeiten .ablage-box.nur-bearbeiten { display: block !important; }
 .plaetze { display: flex; flex-direction: column; }
 /* Kacheln höchstens 4 : 3 breit (Wunsch 27.11.2026 ~14:46: „bei der Anwesenheit sollen dann die Köpfe oben und unten nicht abgeschnitten sein“ – ohne
    Seitenspalte wurden die Tische 171 × 74 breit) = Format des Zuschnitts; ist mehr Platz da, steht der Sitzplan mittig, die Tische bleiben aneinander. */
-.plaetze { --platz-b: calc(var(--platz-h, 120px) * 0.8); } /* seit Stand .31 Hochformat 4 : 5 = Format des Zuschnitts auf iPad und PC (Wunsch 27.11.2026 ~23:57; TISCH_FORMAT in app.js) */
+/* Seit Stand .32 GRUNDFORMAT für alle Anzeigen (Wunsch 28.11.2026 ~09:20, mit Skizze: „… die Bilder werden immer im gleichen Format dargestellt … je nach Monitor
+   wird es eben größer oder kleiner skaliert. Unterhalb des Bildes steht dann der Name. und die Tische sind nicht quadratisch, sondern eben in diesem Format. und das
+   gilt grundsätzlich für alle Anzeigen …“): Foto 5 : 6 (Breite : Höhe), darunter der Namensstreifen mit 16 % der Breite – der Tisch ist 25 : 34 (TISCH_FORMAT in app.js). */
+/* --platz-rand = was Rand und Innenabstand von Platz und Karte zusammen wegnehmen (Karte 2 × 2 px; in „Sitzplan bearbeiten“ dazu Platz 2 × (5 + 2) px, eng 2 × (3 + 2) px):
+   so hat das FOTO genau 5 : 6 und der Streifen genau 16 % der Fotobreite, auch in „Sitzplan bearbeiten“. */
+.plaetze { --platz-rand: 4px; --platz-b: calc((var(--platz-h, 120px) - var(--platz-rand)) * 25 / 34 + var(--platz-rand)); }
+body.bearbeiten .plaetze { --platz-rand: 18px; }
+body.bearbeiten.eng .plaetze { --platz-rand: 14px; }
 .reihe, .reihen-gang { display: grid; justify-content: center; }
 .platz { min-height: var(--platz-h, 120px); padding: 5px; border: 2px dashed transparent; border-radius: 12px; background: var(--platz); display: flex; align-items: center; justify-content: center; position: relative; }
 /* Die Karte füllt den ganzen Tisch (Wunsch 27.11.2026, Stand .24: „… dass die Bilder den kompletten Tisch, also das Rechteck ausfüllen“) */
-.platz .karte { width: 100%; max-width: none; height: auto; align-self: stretch; container-type: inline-size; }
-.platz .name { font-size: clamp(12px, 9cqw, 16px); }
+.platz .karte { width: 100%; max-width: none; height: auto; align-self: stretch; }
 /* Passt der Sitzplan nicht in die Höhe (iPad quer, Notebook), rückt alles enger zusammen; die Bildgröße setzt einpassen() in app.js
    (iPad-Test 27.11.2026: vorderste Reihe und Tafel lagen unter dem Bildschirmrand). */
 body.eng .raum { padding-top: 10px; padding-bottom: 10px; }
 body.eng .tafel { margin-top: 8px; padding: 4px; }
 body.eng .platz { padding: 3px; }
-body.eng .platz .name { display: block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* eine Zeile: Vorname bleibt lesbar, vom Bild bleibt mehr zu sehen */
 .anw-kurz { display: none; }
 body.eng #sitzplan .anw-kurz { display: inline; }
 body.eng #sitzplan .anw-lang { display: none; }
@@ -148,9 +153,9 @@ body.bearbeiten .platz { border-color: var(--linie); }
 body.bearbeiten .platz .nr { display: block; }
 .ablage-box { margin-top: 14px; }
 .ablage { display: flex; flex-wrap: wrap; gap: 8px; min-height: 116px; border: 2px dashed var(--linie); border-radius: 12px; padding: 8px; }
-.karte {
-  width: 112px; height: 84px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: pointer;
-  display: block; padding: 0; border-radius: 12px;
+.karte { /* außerhalb des Sitzplans („Noch ohne Platz“, beim Ziehen) im selben Format 25 : 34 */
+  width: 84px; height: 114px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: pointer;
+  display: flex; flex-direction: column; padding: 0; border-radius: 12px; container-type: inline-size;
   background: var(--flaeche); border: 2px solid var(--linie); position: relative;
 }
 .karte { touch-action: none; } /* Ziehen auf dem iPad in beiden Betriebsarten */
@@ -168,19 +173,23 @@ body.bearbeiten .karte { cursor: grab; }
    dass man es trotz Bild lesen kann.“). Seit Stand .25 (Wunsch 27.11.2026 ~14:30: „… nimm da unten einen weißen Streifen, wo der Name steht. und
    der weiße Streifen kann auch leicht transparent sein.“) steht der Name auf einem leicht durchsichtigen WEISSEN Streifen in dunkler Schrift; doppelte
    Namen und ein zugeschalteter Nachname rot. Punkt, Haken, Note und Abzeichen liegen in den Ecken darüber. Ohne Foto: Farbfläche mit Kürzel.
-   Das runde Bild in der Seitenspalte bleibt rund. */
-.karte .bild { position: absolute; inset: 0; width: auto; height: auto; border-radius: 10px; padding-bottom: 18px; font-size: 24px; }
+   Seit Stand .32 (Grundformat, siehe .plaetze oben) liegt der Name NICHT mehr auf dem Foto: oben das Foto 5 : 6, darunter ein eigener weißer Streifen
+   mit dem Namen in einer Zeile (zu lange Namen werden kleiner, siehe namenEinpassen() in app.js, dann „…“). Auch das Foto in der Seitenspalte ist 5 : 6. */
+.karte .bild { position: relative; inset: auto; width: 100%; height: auto; aspect-ratio: 5 / 6; border-radius: 10px 10px 0 0; padding-bottom: 0; font-size: 24px; }
 /* Seit Stand .28 (Wunsch 27.11.2026 abends: „Auf dem iPad sieht man bei der Anwesenheit nur die Augen von den Schülern. Bitte macht es so, dass man immer
    die ganzen Gesichter sieht. und dann gibt es noch einen großen grauen Streifen über dem Kopf, der unnötig ist.“): Das Foto liegt ABSOLUT über der ganzen
    Kachel. Vorher war es ein Rasterkind mit height: 100 % – die Höhe ließ sich nicht auflösen, das Foto wurde in seiner eigenen Form (quadratisch, also
    höher als der 4 : 3-Tisch) oben angelegt: sichtbar blieb nur der Hintergrund über dem Kopf und die Augen. Jetzt deckt es die Kachel genau wie im Zuschnitt
    (Feld 4 : 3, Namensstreifen unten über dem Foto) – was man beim Zuschneiden sieht, steht auf dem Tisch. Ältere quadratische Fotos (und Moodle-Profilbilder)
-   sind höher als der Tisch: Sie werden unten angelegt, damit der leere Rand über dem Kopf wegfällt und Mund und Kinn über dem Namensstreifen bleiben. */
-.karte .bild img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 100%; }
+   sind höher als der Tisch: Sie werden unten angelegt, damit der leere Rand über dem Kopf wegfällt und Mund und Kinn über dem Namensstreifen bleiben.
+   Seit Stand .32 sind ältere Fotos (400 × 300, quadratisch) breiter als das Feld 5 : 6 und werden nur seitlich gekürzt; die 4 : 5-Fotos von Stand .31 sind
+   etwas höher – dort fällt mehr unten weg (unter dem Kopf lag dort der Namensstreifen). */
+.karte .bild img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 25%; }
 .platz .karte .bild { font-size: min(21cqw, calc(var(--platz-h, 120px) * .3)); }
-.karte .name { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; padding: 2px 5px 3px; border-radius: 0 0 10px 10px;
-  background: rgba(255, 255, 255, .84); color: #1d2330; font-weight: 600;
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.karte .name { flex: 1 0 0; height: 0; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 4px; overflow: hidden;
+  border-radius: 0 0 10px 10px; background: #fff; color: #1d2330; font-weight: 600; font-size: clamp(9px, 11.5cqw, 17px); line-height: 1.1; }
+.karte .name-text { min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kopf .bild { width: 60px; height: 72px; border-radius: 10px; } /* Seitenspalte: dasselbe Format 5 : 6 */
 .karte .name.doppelt, .karte .name .nn { color: #c93c37; font-weight: 700; } /* fest, auch im dunklen Erscheinungsbild: der Streifen bleibt weiß */
 .karte .punkt, .karte .haken, .karte .note, .karte .st-zahl { z-index: 2; }
 .karte .punkt, .karte .haken { box-shadow: 0 0 0 2px #fff; }
@@ -258,13 +267,13 @@ th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--lini
 .foto-wahl { display: flex; gap: 10px; flex-wrap: wrap; }
 .fotos-liste { display: grid; gap: 6px; }
 .foto-zeile { display: grid; grid-template-columns: 56px minmax(0, 1fr) minmax(170px, 260px) auto; gap: 8px; align-items: center; padding: 4px; border-radius: 9px; }
-.foto-zeile img { width: 56px; height: 56px; object-fit: cover; border-radius: 50%; background: var(--linie); }
+.foto-zeile img { width: 47px; height: 56px; object-fit: cover; border-radius: 6px; background: var(--linie); } /* 5 : 6 wie überall (seit Stand .32) */
 .foto-zeile .foto-datei { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
 .foto-zeile select { min-height: 40px; }
 .foto-zeile.doppelt { outline: 2px solid var(--w5); }
 @media (max-width: 620px) { .foto-zeile { grid-template-columns: 56px minmax(0, 1fr) auto; } .foto-zeile select { grid-column: 2 / 3; } }
 .zuschnitt { display: grid; gap: 10px; justify-items: center; }
-.zuschnitt canvas { width: min(100%, 420px, calc(60vh * 780 / 930)); aspect-ratio: 780 / 930; border-radius: 12px; touch-action: none; background: #2b2f36; cursor: grab; }
+.zuschnitt canvas { width: min(100%, 400px, calc(60vh * 780 / 996)); aspect-ratio: 780 / 996; border-radius: 12px; touch-action: none; background: #2b2f36; cursor: grab; }
 .zuschnitt .kopf-zeile { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
 .zuschnitt label { display: flex; gap: 8px; align-items: center; width: min(100%, 440px); }
 .zuschnitt input[type=range] { flex: 1; }

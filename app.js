@@ -3,7 +3,7 @@
    Aufbau nach dem vom Lehrer abgenommenen Mockup (21.11.2026). */
 (() => {
   'use strict';
-  const STAND = '2026-11-28.31';
+  const STAND = '2026-11-28.32';
   // Moodle-Fassung: liegt die App als Datei in einem Moodle-Kurs, ist die Adresse …/pluginfile.php/…
   const IN_MOODLE = /\/pluginfile\.php\//.test(location.pathname);
   const WERT = { '++': 1, '+': 2, 'o': 3, '-': 4, '--': 5 };
@@ -383,9 +383,10 @@
   function karte(s) {
     const k = document.createElement('div'); k.className = 'karte' + (s.id === gewaehlt ? ' gewaehlt' : ''); k.dataset.id = s.id; k.title = s.name;
     const n = document.createElement('div'); n.className = 'name' + (nameDoppelt(s) ? ' doppelt' : '');
+    const nt = document.createElement('span'); nt.className = 'name-text'; n.append(nt); // eine Zeile im Namensstreifen unter dem Foto (seit Stand .32)
     if (st.nurVorname && mitNN(s) && nachnameVon(s)) { // Nachname rot (Wunsch 27.11.2026)
-      const nn = document.createElement('span'); nn.className = 'nn'; nn.textContent = nachnameVon(s); n.append(vornameVon(s) + ' ', nn);
-    } else n.textContent = kartenName(s);
+      const nn = document.createElement('span'); nn.className = 'nn'; nn.textContent = nachnameVon(s); nt.append(vornameVon(s) + ' ', nn);
+    } else nt.textContent = kartenName(s);
     const heute = eintraege(s.id, 'heute'), a = anwHeute(s.id);
     k.classList.add('anw-' + (a ? a.s : 'offen'));
     // Punkt = Anwesenheit (grau offen, grün da, orange später, rot fehlt); blauer Haken = heute bewertet (Wunsch 27.11.2026)
@@ -502,10 +503,19 @@
   // lagen unter dem Bildschirmrand. Passt er nicht, rückt alles enger zusammen und die Bilder werden kleiner, bis die Tafel zu sehen ist.
   // Gerechnet wird nur, wenn sich Größe, Klasse, Reihen, Plätze, Durchgänge oder Betriebsart geändert haben.
   let passSchluessel = '';
-  // Tische im Hochformat 4 : 5 (Breite : Höhe) = Format des Zuschnitts, auf iPad und PC gleich (seit Stand .31; .30 kurz quadratisch). Abgleich 28.11.2026 an den vier
-  // Klassen bei iPad quer: Die Fläche über dem Namensstreifen (dort steht der Kopf) ist so in drei Klassen deutlich höher und nirgends niedriger als quadratisch.
-  const TISCH_FORMAT = 0.8, TISCH_MAX = 160; // Breite/Höhe; größte Tischhöhe in px
-  function einpassen() {
+  // Grundformat für alle Anzeigen seit Stand .32 (Wunsch 28.11.2026 ~09:20, Skizze des Lehrers: Foto 175 × 211, Namensstreifen 28 darunter): Foto 5 : 6 (Breite : Höhe),
+  // darunter der Namensstreifen mit 16 % der Breite – der Tisch ist 25 : 34; je nach Bildschirm größer oder kleiner. Davor: .31 4 : 5 mit dem Namen auf dem Foto, .30 quadratisch.
+  const FOTO_FORMAT = 5 / 6, STREIFEN = 0.16, TISCH_FORMAT = 1 / (1 / FOTO_FORMAT + STREIFEN), TISCH_MAX = 176; // Breite/Höhe; größte Tischhöhe in px (≈ 129 px breit)
+  function einpassen() { tischGroesse(); namenEinpassen(); }
+  // Zu lange Namen werden im Streifen kleiner (bis auf drei Viertel, nie unter 8 px), erst dann „…“. Läuft nach jedem Zeichnen und jeder Größenänderung: erst alle
+  // zurücksetzen, dann alle messen, dann alle setzen (sonst rechnet der Browser bei jeder Karte das ganze Layout neu).
+  function namenEinpassen() {
+    const t = [...document.querySelectorAll('.karte .name-text')];
+    for (const e of t) e.style.fontSize = '';
+    const mass = t.map((e) => ({ e, voll: e.scrollWidth, platz: e.parentNode.clientWidth - 8, gr: parseFloat(getComputedStyle(e.parentNode).fontSize) }));
+    for (const m of mass) if (m.voll > m.platz + 0.5 && m.platz > 0) m.e.style.fontSize = Math.max(Math.min(8, m.gr), m.gr * Math.max(0.75, m.platz / m.voll)).toFixed(1) + 'px';
+  }
+  function tischGroesse() {
     const raum = $('raum'), tafel = raum.querySelector('.tafel'), d = kd(), p = plaetzeEl.style;
     if (!d) { passSchluessel = ''; p.removeProperty('--platz-h'); p.removeProperty('--bild-max'); document.body.classList.remove('eng'); return; }
     const schluessel = [raum.clientWidth, raum.clientHeight, st.klasse, d.raum || '', d.reihen, plaetzeEl.querySelectorAll('.reihe').length, d.spalten, d.schueler.length, modus, JSON.stringify(d.gaenge || {})].join('|');
@@ -520,7 +530,8 @@
       let g = 0; for (let c = 1; c < d.spalten; c++) g += ga['s' + c + ':' + r] ? px('--gang-breit') : modus === 'bearbeiten' ? px('--gang-tippen') : px('--gang-schmal');
       gangMax = Math.max(gangMax, g);
     }
-    let h = Math.max(56, Math.min(TISCH_MAX, Math.floor((plaetzeEl.clientWidth - gangMax) / Math.max(1, d.spalten) / TISCH_FORMAT)));
+    const rand = parseFloat(getComputedStyle(plaetzeEl).getPropertyValue('--platz-rand')) || 0; // Ränder von Platz und Karte (app.css): das Foto innen bleibt genau 5 : 6
+    let h = Math.max(56, Math.min(TISCH_MAX, Math.floor(((plaetzeEl.clientWidth - gangMax) / Math.max(1, d.spalten) - rand) / TISCH_FORMAT + rand)));
     p.setProperty('--platz-h', h + 'px');
     const imRaum = (y) => y - raum.getBoundingClientRect().top + raum.scrollTop;
     const nutzbar = () => raum.clientHeight - parseFloat(getComputedStyle(raum).paddingBottom);
@@ -534,6 +545,7 @@
     h = Math.max(56, Math.min(h, proReihe)); p.setProperty('--platz-h', h + 'px');
   }
   if (typeof ResizeObserver === 'function') new ResizeObserver(() => einpassen()).observe($('raum'));
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => namenEinpassen()); // Schrift geladen: Namen neu messen
 
   // Durchgänge je Klasse: { 's<c>:<r>': true } = zwischen Platz c und c+1 in Reihe r; { 'r<r>:<c>': true } = zwischen Reihe r und r+1 bei Platz c.
   function gaengeVon(d) {
@@ -1293,11 +1305,8 @@
     if (daten) DB.schreib('fotos', 'o:' + id, daten).catch(() => {}); else DB.loesch('fotos', 'o:' + id).catch(() => {});
     if (IN_MOODLE) { MO.origAuftraege.set(id, daten); moodleMerken(true); }
   }
-  // Namensstreifen wie auf dem Tisch: Anteil an der Tischhöhe (gemessen an einem Tisch im Sitzplan, sonst ein Fünftel)
-  const streifenAnteil = () => { const k = document.querySelector('#plaetze .platz .karte'), n = k && k.querySelector('.name');
-    const a = k && n ? n.getBoundingClientRect().height / k.getBoundingClientRect().height : 0; return a > 0.08 && a < 0.4 ? a : 0.2; };
   function fotoOeffnen(s) {
-    foto.s = s; foto.img = null; foto.origNeu = false; foto.angefasst = false; foto.streifen = streifenAnteil(); $('fotoKopfInfo').textContent = '';
+    foto.s = s; foto.img = null; foto.origNeu = false; foto.angefasst = false; $('fotoKopfInfo').textContent = '';
     $('fotoName').textContent = s.name; $('zuschnitt').hidden = true;
     $('fotoSpeichern').disabled = true; $('fotoLoeschen').hidden = !fotos.has(s.id); $('fotoDlg').showModal();
     if (fotos.has(s.id)) fotoBearbeiten(s);
@@ -1328,9 +1337,11 @@
     img.onerror = () => alert('Dieses Bild lässt sich nicht öffnen.');
     img.src = foto.url;
   }
-  // Zuschnitt = genau der Tisch: seit Stand .31 Hochformat 4 : 5 (wie TISCH_FORMAT), auf dem iPad wie am PC (Wunsch 27.11.2026 ~23:57: „… Aber dass der Rahmen auch der ist, der dann
-  // später auch angezeigt wird auf dem Tablet oder auf dem PC.“); gespeichert wird 400 × 400. Ältere Fotos (320 × 320, 400 × 300) werden mit „cover“ eingepasst.
-  const CH = C * 5 / 4;
+  // Zuschnitt = genau das Foto auf dem Tisch, auf dem iPad wie am PC (Wunsch 27.11.2026 ~23:57: „… Aber dass der Rahmen auch der ist, der dann später auch angezeigt
+  // wird auf dem Tablet oder auf dem PC.“). Seit Stand .32 das Grundformat (Wunsch 28.11.2026 ~09:20: „… in dieses Format wird dann das Bild, das hochgeladen wird oder
+  // eingefügt wird, eben hinzugefügt und da soll es eben skalierbar sein und verschiebbar, so dass man es dann in diesen Rahmen einfügen kann.“): Rahmen = Foto 5 : 6,
+  // der Namensstreifen steht darunter (nicht mehr auf dem Foto); gespeichert wird 400 × 480. Ältere Fotos (400 × 500, 400 × 400, 400 × 300) passt „cover“ ein.
+  const CH = C / FOTO_FORMAT, STREIFEN_H = Math.round(C * STREIFEN), AUS_B = 400, AUS_H = Math.round(AUS_B / FOTO_FORMAT);
   const zuschnittMass = (img, zoom) => { const sc = Math.max(C / img.naturalWidth, CH / img.naturalHeight) * zoom; return { w: img.naturalWidth * sc, h: img.naturalHeight * sc }; };
   const fotoMass = () => zuschnittMass(foto.img, foto.zoom);
   // Verschieben auch über den Rahmen hinaus (Wunsch 27.11.2026 ~14:32: „… soll man es auch über den Rahmen hinaus verschieben können, so falls das
@@ -1360,9 +1371,9 @@
   const fotoMalen = (ctx, g) => zuschnittMalen(ctx, g, foto.img, foto);
   // Anzeige (Wunsch 27.11.2026 ~23:56: „Wenn ich bei Bewerten das Foto ausrichte, da sieht man gar nicht die Grenzen außenrum, mein verschiebtes Foto auf weißem
   // Grund und man sieht nicht, was ist jetzt der angezeigte Bereich.“): um das Feld ein dunkler Rand, in dem das Foto abgedunkelt weitergeht; das Feld selbst ist
-  // der Tisch (weiß umrandet), unten der Namensstreifen so hoch wie auf dem Tisch.
+  // der Tisch (weiß umrandet). Seit Stand .32 ist das Feld das Foto 5 : 6; der Namensstreifen steht wie auf dem Tisch DARUNTER (verdeckt das dunkle Umfeld).
   const RAND = Math.round(C * 0.15), cv = $('fotoCanvas');
-  cv.width = C + 2 * RAND; cv.height = CH + 2 * RAND;
+  cv.width = C + 2 * RAND; cv.height = CH + STREIFEN_H + 2 * RAND;
   function fotoZeichnen() {
     const ctx = cv.getContext('2d'), W = cv.width, H = cv.height, m = fotoMass();
     ctx.fillStyle = '#2b2f36'; ctx.fillRect(0, 0, W, H);
@@ -1370,11 +1381,11 @@
     ctx.drawImage(foto.img, C / 2 - m.w / 2 + foto.ox, CH / 2 - m.h / 2 + foto.oy, m.w, m.h); // außerhalb des Felds: das Foto, gleich abgedunkelt
     ctx.fillStyle = 'rgba(28,31,36,.68)'; ctx.beginPath(); ctx.rect(-RAND, -RAND, W, H); ctx.rect(0, 0, C, CH); ctx.fill('evenodd');
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, C, CH); ctx.clip(); fotoMalen(ctx, C); ctx.restore(); // im Feld genau das, was gespeichert wird
-    const sh = CH * (foto.streifen || 0.2);
-    ctx.fillStyle = 'rgba(255,255,255,.84)'; ctx.fillRect(0, CH - sh, C, sh);
-    ctx.fillStyle = '#5f6675'; ctx.font = '600 ' + Math.round(sh * 0.5) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(foto.s ? kartenName(foto.s) : 'Name', C / 2, CH - sh / 2, C * 0.94);
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, CH, C, STREIFEN_H); // Namensstreifen unter dem Foto
+    ctx.fillStyle = '#1d2330'; ctx.font = '600 ' + Math.round(STREIFEN_H * 0.62) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(foto.s ? kartenName(foto.s) : 'Name', C / 2, CH + STREIFEN_H / 2, C * 0.94);
     ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.strokeRect(-2, -2, C + 4, CH + 4);
+    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.moveTo(0, CH + 0.5); ctx.lineTo(C, CH + 0.5); ctx.stroke(); // Kante Foto | Streifen
     ctx.restore();
   }
   // Verschieben mit einem Finger, Größe mit zwei Fingern (Wunsch 27.11.2026 ~23:57: „… die Größe ändern von den Bildern bitte nicht unten über diesen
@@ -1437,11 +1448,14 @@
   // Kopf samt Haaren im Verhältnis zur Gesichtsgröße s von pico, ab der Gesichtsmitte. Abgeglichen am 28.11.2026 (nur Zahlen, im Browser des Lehrers): 82 von 83
   // Fotos und 55 von 56 Originalen erkannt; mit 0,62 / 0,48 liegt der Kopf im Original im Mittel bei 8 % bis 79 % der Bildhöhe, nur einmal minimal darüber.
   const KOPF = { oben: 0.62, unten: 0.48, breit: 1.1 };
-  function kopfZuschnitt(img, k, streifen) {
-    const W = img.naturalWidth, H = img.naturalHeight, basis = Math.max(C / W, CH / H), frei = CH * (1 - streifen), rand = CH * 0.03;
+  // Seit Stand .32 liegt kein Namensstreifen mehr auf dem Foto: Der Kopf füllt das ganze Feld 5 : 6 (meist in der Breite), senkrecht etwas über der Mitte
+  // (40 % der freien Höhe darüber, 60 % darunter – dort Hals und Schultern).
+  function kopfZuschnitt(img, k) {
+    const W = img.naturalWidth, H = img.naturalHeight, basis = Math.max(C / W, CH / H), frei = CH, rand = CH * 0.03;
     const hoch = (KOPF.oben + KOPF.unten) * k.s, breit = KOPF.breit * k.s;
     const zoom = Math.max(0.3, Math.min(8, Math.min((frei - 2 * rand) / hoch, (C - 2 * rand) / breit) / basis)), sc = basis * zoom, mw = W * sc, mh = H * sc;
-    let ox = mw / 2 - k.x * sc, oy = frei / 2 - CH / 2 + mh / 2 - (k.y + (KOPF.unten - KOPF.oben) / 2 * k.s) * sc; // Kopf waagrecht mittig, senkrecht mittig über dem Streifen
+    const kopfOben = rand + Math.max(0, frei - 2 * rand - hoch * sc) * 0.4;
+    let ox = mw / 2 - k.x * sc, oy = kopfOben - CH / 2 + mh / 2 - (k.y - KOPF.oben * k.s) * sc; // Kopf waagrecht mittig, senkrecht etwas über der Mitte
     const lage = () => { const l = C / 2 - mw / 2 + ox, t = CH / 2 - mh / 2 + oy;
       return { l, t, r: l + mw, b: t + mh, kl: l + (k.x - breit / 2) * sc, kr: l + (k.x + breit / 2) * sc, ko: t + (k.y - KOPF.oben * k.s) * sc, ku: t + (k.y + KOPF.unten * k.s) * sc }; };
     // nur in der Richtung, in der das Foto den Tisch ganz füllen kann – sonst bliebe die Lücke auf der anderen Seite und der Kopf säße schief
@@ -1458,7 +1472,7 @@
     kn.disabled = false; if (foto.img !== img || foto.s !== s) return; // inzwischen ein anderes Bild
     if (!kopf) { info.textContent = fehler ? 'Automatisch geht gerade nicht (' + (fehler.message || fehler) + ').' : 'Kein Gesicht gefunden – bitte von Hand einpassen.'; return; }
     if (foto.angefasst && !knopf) { info.textContent = ''; return; } // inzwischen selbst verschoben: das gilt
-    Object.assign(foto, kopfZuschnitt(img, kopf, foto.streifen || 0.2)); foto.angefasst = false; fotoBegrenzen(); fotoZeichnen();
+    Object.assign(foto, kopfZuschnitt(img, kopf)); foto.angefasst = false; fotoBegrenzen(); fotoZeichnen();
     info.textContent = 'Kopf automatisch eingepasst.';
   }
   $('fotoKopf').addEventListener('click', () => kopfAuto(true));
@@ -1470,14 +1484,14 @@
     const mitFoto = d.schueler.filter((s) => fotos.has(s.id)), liste = mitFoto.filter((s) => !(s.zuschnitt && s.zuschnitt.hand)), hand = mitFoto.length - liste.length;
     if (!liste.length) { zeigeMeldung(hand ? 'Alle Fotos dieser Klasse sind von Hand eingepasst – nichts zu tun.' : 'In dieser Klasse gibt es noch keine Fotos.'); return; }
     if (!confirm(liste.length + ' Fotos der Klasse „' + d.name + '“ automatisch einpassen: der ganze Kopf, das Feld ausgefüllt.' + (hand ? '\n' + hand + ' von Hand eingepasste bleiben, wie sie sind.' : '') + '\n\nWeiter?')) return;
-    const streifen = streifenAnteil(); let n = 0, ohne = 0, i = 0;
+    let n = 0, ohne = 0, i = 0;
     for (const s of liste) {
       zeigeMeldung('Fotos werden eingepasst … ' + (++i) + ' von ' + liste.length);
       const orig = await originalLaden(s.id);
       let img = null; try { img = await bildLaden(orig || fotos.get(s.id)); } catch (e) { ohne++; continue; }
       let k = null; try { k = await kopfFinden(img); } catch (e) { /* ohne Erkennung */ }
       if (!k) { ohne++; continue; }
-      const z = kopfZuschnitt(img, k, streifen), out = document.createElement('canvas'); out.width = 400; out.height = 500; zuschnittMalen(out.getContext('2d'), 400, img, z);
+      const z = kopfZuschnitt(img, k), out = document.createElement('canvas'); out.width = AUS_B; out.height = AUS_H; zuschnittMalen(out.getContext('2d'), AUS_B, img, z);
       const daten = out.toDataURL('image/jpeg', 0.85);
       try { await DB.schreib('fotos', s.id, daten); } catch (e) { ohne++; continue; }
       if (!orig) originalMerken(s.id, originalVon(img));
@@ -1488,7 +1502,7 @@
   }
   $('fotoSpeichern').addEventListener('click', async () => {
     if (!foto.img || !foto.s) return;
-    const out = document.createElement('canvas'); out.width = 400; out.height = 500; fotoMalen(out.getContext('2d'), 400); // 4 : 5 wie der Tisch (seit Stand .31)
+    const out = document.createElement('canvas'); out.width = AUS_B; out.height = AUS_H; fotoMalen(out.getContext('2d'), AUS_B); // 5 : 6 wie das Foto auf dem Tisch (seit Stand .32)
     const daten = out.toDataURL('image/jpeg', 0.85);
     try { await DB.schreib('fotos', foto.s.id, daten); } catch (e) { alert('Das Foto ließ sich nicht speichern: ' + (e && e.message || e)); return; }
     if (foto.origNeu) originalMerken(foto.s.id, originalVon(foto.img));
@@ -1593,13 +1607,12 @@
     if (ersetzt && !confirm((ersetzt === 1 ? 'Ein Schüler hat' : ersetzt + ' Schüler haben') + ' schon ein Foto. Ersetzen?')) return;
     let n = 0;
     const d = kd();
-    const streifen = streifenAnteil();
     for (const f of bereit) {
       // Kopf automatisch einpassen (seit Stand .30); ohne gefundenes Gesicht: mittig, bei überstehendem Hochformat eher den oberen Teil
       const s = d && d.schueler.find((x) => x.id === f.sid);
-      let z = null; try { const k = await kopfFinden(f.img); if (k) z = kopfZuschnitt(f.img, k, streifen); } catch (e) { /* ohne Erkennung */ }
+      let z = null; try { const k = await kopfFinden(f.img); if (k) z = kopfZuschnitt(f.img, k); } catch (e) { /* ohne Erkennung */ }
       if (!z) z = { zoom: 1, ox: 0, oy: Math.round(Math.max(0, (zuschnittMass(f.img, 1).h - CH) / 2) * 0.6 * 10) / 10 };
-      const out = document.createElement('canvas'); out.width = 400; out.height = 500; zuschnittMalen(out.getContext('2d'), 400, f.img, z);
+      const out = document.createElement('canvas'); out.width = AUS_B; out.height = AUS_H; zuschnittMalen(out.getContext('2d'), AUS_B, f.img, z);
       const daten = out.toDataURL('image/jpeg', 0.85);
       try { await DB.schreib('fotos', f.sid, daten); } catch (e) { alert('Ein Foto ließ sich nicht speichern: ' + (e && e.message || e)); break; }
       fotos.set(f.sid, daten); moodleFoto(f.sid, daten); n++;
@@ -2003,6 +2016,6 @@
     if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
   }
   window.__klassenApp = { stand: STAND, zustand: () => st, fotoAnzahl: () => fotos.size, bildVerkleinern, moodle: IN_MOODLE, speichereJetzt: () => moodleSpeichern(), fehlzeitenUebernehmen, fehlzeiten: (klasse, id) => fehlzeiten(id, st.klassen[klasse]),
-    zuschnitt: () => ({ zoom: foto.zoom, ox: foto.ox, oy: foto.oy, angefasst: !!foto.angefasst, streifen: foto.streifen, bild: !!foto.img }) };
+    zuschnitt: () => ({ zoom: foto.zoom, ox: foto.ox, oy: foto.oy, angefasst: !!foto.angefasst, format: CH / C, aus: AUS_B + '×' + AUS_H, bild: !!foto.img }) };
   start();
 })();
